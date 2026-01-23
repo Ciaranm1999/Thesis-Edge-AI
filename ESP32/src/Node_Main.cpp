@@ -70,9 +70,9 @@ float MQ3_getResistance() {
   return Rs;
 }
 
-// ESP-NOW send callback (optional debug) - NEW SIGNATURE
-void onDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
-  // 'info' contains metadata (src/dst MAC, etc.) if you ever need it
+// ESP-NOW send callback (optional debug)
+void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  // mac_addr contains the destination MAC address
   /*
   Serial.print("Last Packet Send Status: ");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
