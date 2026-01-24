@@ -43,15 +43,15 @@ hostname -I
 ### Using PowerShell (Built-in)
 ```powershell
 # Basic connection
-ssh pi@<RASPBERRY_PI_IP>
+ssh edge@<RASPBERRY_PI_IP>
 
 # Example:
-ssh pi@192.168.1.100
+ssh edge@192.168.2.84
 ```
 
-**Default Credentials:**
-- Username: `pi`
-- Password: `raspberry`
+**Your Credentials:**
+- Username: `edge`
+- Password: `[your_password]`
 
 ### First Time Connection
 You'll see a security prompt:
