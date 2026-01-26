@@ -267,4 +267,71 @@ Or check:
 
 ---
 
+## 💻 Getting Data to Your Laptop
+
+### Option 1: Manual Copy (Quick & Easy)
+
+From your Windows laptop:
+```powershell
+# Copy all data to your Desktop
+scp -r edgeai@192.168.2.84:~/thesis_data "C:\Users\cmahe\Desktop\"
+
+# Or just sensor data
+scp -r edgeai@192.168.2.84:~/thesis_data/sensor_data "C:\Users\cmahe\Desktop\"
+
+# Or just images
+scp -r edgeai@192.168.2.84:~/thesis_data/images "C:\Users\cmahe\Desktop\"
+```
+
+### Option 2: Auto-Sync Script (Recommended)
+
+Use the PowerShell sync script:
+```powershell
+# From Windows - in your project folder
+cd "C:\Users\cmahe\OneDrive\Desktop\SSE Masters\Thesis\Code\Thesis-Edge-AI\RaspberryPi\scripts"
+
+# Run the sync script
+.\Sync-ThesisData.ps1
+```
+
+This will:
+- Copy all CSV files to `C:\Users\cmahe\Desktop\thesis_data\sensor_data\`
+- Copy all images to `C:\Users\cmahe\Desktop\thesis_data\images\`
+- Copy logs
+- Show summary of downloaded files
+
+### Option 3: Web Dashboard (View in Browser)
+
+**On Raspberry Pi:**
+```bash
+# Install Flask (one time)
+pip3 install flask pandas --break-system-packages
+
+# Run the dashboard
+cd ~/Thesis-Edge-AI/RaspberryPi/scripts
+python3 web_dashboard.py
+```
+
+**On Your Laptop:**
+Open browser and go to: `http://192.168.2.84:5000`
+
+You can now:
+- ✅ View latest sensor readings in a table
+- ✅ Browse and download CSV files
+- ✅ View recent images
+- ✅ Auto-refreshes every minute
+
+---
+
+## 📊 Future Dashboard Ideas
+
+Once you have more data, you could create:
+- Real-time graphs with Plotly/Chart.js
+- Anomaly detection alerts
+- Historical trends analysis
+- Export to Excel with Python openpyxl
+- Power BI or Tableau integration
+
+---
+
 **That's it! Start with `docs/QUICK_START.md` and follow the steps above.** 🚀
