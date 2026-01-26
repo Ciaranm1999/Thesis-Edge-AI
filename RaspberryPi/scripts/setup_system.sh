@@ -58,7 +58,7 @@ echo "✓ Directories created"
 echo ""
 echo "Step 8: Installing systemd service..."
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-sudo cp "$SCRIPT_DIR/thesis-data-collector.service" /etc/systemd/system/
+sudo cp "$SCRIPT_DIR/../services/thesis-data-collector.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 echo "✓ Service installed"
 

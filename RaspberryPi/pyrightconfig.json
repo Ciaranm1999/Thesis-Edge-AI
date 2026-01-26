@@ -1,0 +1,27 @@
+{
+  "typeCheckingMode": "basic",
+  "reportMissingImports": false,
+  "reportMissingModuleSource": false,
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv"
+  ],
+  "extraPaths": ["./config"],
+  "pythonVersion": "3.11",
+  "executionEnvironments": [
+    {
+      "root": "scripts",
+      "extraPaths": ["../config"]
+    },
+    {
+      "root": "tests",
+      "extraPaths": ["../config"]
+    }
+  ],
+  "ignore": [
+    "paho",
+    "picamera2",
+    "RPi"
+  ]
+}

@@ -2,52 +2,152 @@
 
 This directory contains code and setup instructions for the Raspberry Pi component of the Thesis Edge AI project.
 
+## 📁 Project Structure
+
+```
+RaspberryPi/
+├── scripts/              # Main scripts and utilities
+│   ├── data_collector.py       # Main MQTT data collection service
+│   ├── setup_system.sh         # System setup script
+│   ├── setup_autologin.sh      # Auto-login configuration
+│   └── Connect-RaspberryPi.ps1 # Windows connection helper
+├── tests/                # Hardware test scripts
+│   ├── camera_test.py          # Camera Module 3 test
+│   ├── camera_test.sh          # Shell-based camera test
+│   └── led_test.py             # GPIO LED test
+├── services/             # Systemd service files
+│   └── thesis-data-collector.service
+├── docs/                 # Documentation
+│   ├── QUICK_START.md          # 10-minute setup guide ⚡
+│   ├── MQTT_SETUP_GUIDE.md     # Complete documentation 📖
+│   ├── README_MQTT.md          # MQTT system overview
+│   ├── FIRST_TIME_SETUP.md     # Initial Pi setup
+│   ├── SSH_SETUP.md            # SSH configuration
+│   └── RUN_TESTS.md            # Hardware testing guide
+├── config/               # Configuration files
+│   └── pyrightconfig.json      # Python type checking config
+└── camera_images/        # Test image output directory
+
+```
+
 ## Hardware
 - **Raspberry Pi** (Model 3/4/5)
 - **Camera Module 3** (12MP, autofocus)
 - **LEDs** for status indication
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. SSH Setup
-See [SSH_SETUP.md](SSH_SETUP.md) for detailed instructions on:
-- Enabling SSH on Raspberry Pi
-- Finding Pi's IP address
-- Connecting from Windows
-- Setting up SSH keys
-
-### 2. Quick Connect
-Use the PowerShell script:
-```powershell
-.\Connect-RaspberryPi.ps1
+### 1. Run Setup Script
+```bash
+cd ~/Thesis-Edge-AI/RaspberryPi/scripts
+chmod +x setup_system.sh
+./setup_system.sh
 ```
 
-Or manually:
-```powershell
-ssh pi@<RASPBERRY_PI_IP>
-# Default password: raspberry
+### 2. Enable Auto-Login
+```bash
+chmod +x setup_autologin.sh
+./setup_autologin.sh
+sudo reboot
 ```
 
-## Project Structure
+### 3. Verify Everything Works
+```bash
+# Check service
+sudo systemctl status thesis-data-collector
+
+# Watch for MQTT messages
+mosquitto_sub -h localhost -t "sensors/#" -v
+
+# Check collected data
+ls -lh ~/thesis_data/
 ```
-RaspberryPi/
-├── SSH_SETUP.md              # SSH setup guide
-├── Connect-RaspberryPi.ps1   # Connection helper script
-├── camera/                   # Camera module scripts
-├── led_test/                 # LED test code
-└── README.md                 # This file
+
+## 🔧 Common Commands
+
+```bash
+# Service management
+sudo systemctl start thesis-data-collector
+sudo systemctl stop thesis-data-collector
+sudo systemctl restart thesis-data-collector
+sudo systemctl status thesis-data-collector
+
+# View logs
+journalctl -u thesis-data-collector -f
+tail -f ~/thesis_data/data_collector.log
+
+# Test MQTT
+mosquitto_sub -h localhost -t "sensors/#" -v
+
+# Test hardware
+cd ~/Thesis-Edge-AI/RaspberryPi/tests
+python3 camera_test.py
+python3 led_test.py
 ```
 
-## Next Steps
-1. ✅ Set up SSH connection
-2. ⬜ Test camera module 3
-3. ⬜ Test LED control
-4. ⬜ Integrate with Edge AI model
-5. ⬜ Connect with ESP32 sensor network
+## 📚 Documentation
 
-## Useful Commands
+For detailed setup and usage instructions, see:
+- **[docs/QUICK_START.md](docs/QUICK_START.md)** - Fast setup guide
+- **[docs/MQTT_SETUP_GUIDE.md](docs/MQTT_SETUP_GUIDE.md)** - Complete system documentation
+- **[docs/README_MQTT.md](docs/README_MQTT.md)** - MQTT system overview
+- **[docs/RUN_TESTS.md](docs/RUN_TESTS.md)** - Hardware testing procedures
 
-### System Information
+## 🎯 System Features
+
+### Data Collection
+- ✅ Receives sensor data from ESP32 nodes via MQTT
+- ✅ Saves data to daily CSV files
+- ✅ Separate file for each node (master, node1, node2)
+- ✅ Timestamped entries
+
+### Camera Control
+- ✅ Captures images every 15 minutes
+- ✅ LED turns on during capture for consistent lighting
+- ✅ Images saved with timestamps
+- ✅ Runs independently of data reception
+
+### Auto-Start
+- ✅ Service starts automatically on boot
+- ✅ Auto-login enabled for hands-free operation
+- ✅ Reconnects to MQTT if connection lost
+- ✅ Comprehensive logging for debugging
+
+## 🌐 MQTT Topics
+
+The system listens to:
+- `sensors/master/data` - Master node data
+- `sensors/node1/data` - Node 1 data  
+- `sensors/node2/data` - Node 2 data
+
+## 📁 Data Storage
+
+All data saved to `~/thesis_data/`:
+```
+thesis_data/
+├── sensor_data/
+│   ├── master_20260126.csv
+│   ├── node1_20260126.csv
+│   └── node2_20260126.csv
+├── images/
+│   ├── capture_20260126_120000.jpg
+│   └── ...
+└── data_collector.log
+```
+
+## 🎓 For Thesis
+
+This system demonstrates:
+- Edge device communication protocols (MQTT)
+- Autonomous data collection
+- Power-efficient ESP32 operation (deep sleep)
+- Multi-sensor data fusion
+- Image capture for AI model training
+
+Future branches will implement:
+- BLE communication (ultra-low power)
+- UART communication (lowest power)
+- Edge AI inference on Raspberry Pi
 ```bash
 # Check Raspberry Pi model
 cat /proc/cpuinfo | grep Model

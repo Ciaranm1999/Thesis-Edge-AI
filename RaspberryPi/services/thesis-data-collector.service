@@ -7,7 +7,7 @@ Wants=mosquitto.service
 Type=simple
 User=edgeai
 WorkingDirectory=/home/edgeai
-ExecStart=/usr/bin/python3 /home/edgeai/Thesis-Edge-AI/RaspberryPi/data_collector.py
+ExecStart=/usr/bin/python3 /home/edgeai/Thesis-Edge-AI/RaspberryPi/scripts/data_collector.py
 Restart=always
 RestartSec=10
 
