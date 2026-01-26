@@ -1,0 +1,19 @@
+[Unit]
+Description=Thesis Data Collection Service
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=edgeai
+WorkingDirectory=/home/edgeai
+ExecStart=/usr/bin/python3 /home/edgeai/Thesis-Edge-AI/RaspberryPi/data_collector.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
