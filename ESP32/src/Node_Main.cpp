@@ -38,8 +38,13 @@ float MQ3_R0 = 20000.0f;   // default fallback if not found
 const char* PREFS_NAMESPACE = "mq3";
 const char* PREFS_KEY       = "r0";
 
+// SGP30 baseline keys
+const char* SGP_NAMESPACE   = "sgp30";
+const char* SGP_ECO2_KEY    = "eco2_base";
+const char* SGP_TVOC_KEY    = "tvoc_base";
+
 // --------- ESP-NOW / MAC ---------
-uint8_t masterMac[] = {0xCC, 0xDB, 0xA7, 0x98, 0xD2, 0xD0}; // <--- put your master MAC here
+uint8_t masterMac[] = {0xCC, 0xDB, 0xA7, 0x98, 0xD2, 0xD0}; // Master MAC
 
 typedef struct __attribute__((packed)) {
   float    temp;
@@ -47,11 +52,20 @@ typedef struct __attribute__((packed)) {
   uint16_t tvoc;
   uint16_t eco2;
   float    mq3_ppm;
+  uint32_t timestamp;  // millis() at time of reading
 } SensorPacket;
 
+// Timing correction packet from master
+typedef struct __attribute__((packed)) {
+  int32_t adjustmentMs;  // positive = sleep longer, negative = sleep shorter
+} TimingPacket;
+
 SensorPacket pkt;
+TimingPacket timingCorrection;
+bool receivedTimingCorrection = false;
 
 unsigned long startMs = 0;
+int32_t sleepAdjustmentMs = 0;  // accumulated adjustment from master
 
 // --------- MQ3 helpers ---------
 float MQ3_getResistance() {
@@ -72,27 +86,53 @@ float MQ3_getResistance() {
 
 // ESP-NOW send callback (optional debug)
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  // mac_addr contains the destination MAC address
-  /*
-  Serial.print("Last Packet Send Status: ");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-  */
+  if (NODE_DEBUG_PRINT_TIMING) {
+    Serial.print("[Node] Packet send status: ");
+    Serial.println(status == ESP_NOW_SEND_SUCCESS ? "SUCCESS" : "FAILED");
+  }
+}
+
+// ESP-NOW receive callback for timing corrections from master
+void onDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
+  if (len == sizeof(TimingPacket)) {
+    memcpy(&timingCorrection, data, sizeof(TimingPacket));
+    receivedTimingCorrection = true;
+    
+    Serial.print("[Node] Received timing correction from master: ");
+    Serial.print(timingCorrection.adjustmentMs);
+    Serial.println(" ms");
+  }
 }
 
 void goToSleepForRemainingCycle() {
   unsigned long activeMs = millis() - startMs;
   long remainingMs = (long)CYCLE_SECONDS * 1000L - (long)activeMs;
+  
+  // Apply accumulated timing correction from master
+  remainingMs += sleepAdjustmentMs;
+  
   if (remainingMs < 100) remainingMs = 100;
 
   if (NODE_DEBUG_PRINT_TIMING) {
-    Serial.print("Node active time this cycle (ms): ");
-    Serial.println(activeMs);
-    Serial.print("Node going to sleep for (ms): ");
-    Serial.println(remainingMs);
+    Serial.println("\n===== NODE SLEEP CALCULATION =====");
+    Serial.print("Active time this cycle: ");
+    Serial.print(activeMs);
+    Serial.println(" ms");
+    
+    if (sleepAdjustmentMs != 0) {
+      Serial.print("Timing adjustment applied: ");
+      Serial.print(sleepAdjustmentMs);
+      Serial.println(" ms");
+    }
+    
+    Serial.print("Final sleep duration: ");
+    Serial.print(remainingMs);
+    Serial.println(" ms");
+    Serial.println("==================================");
   }
 
   uint64_t sleepUs = (uint64_t)remainingMs * 1000ULL;
-  Serial.println("Node going to deep sleep...");
+  Serial.println("\n[Node] Going to deep sleep...\n");
   esp_sleep_enable_timer_wakeup(sleepUs);
   delay(50);
   esp_deep_sleep_start();
@@ -126,6 +166,22 @@ void setup() {
 
   if (!sgp.begin()) {
     Serial.println("SGP30 init failed on node!");
+  } else {
+    // Restore SGP30 baseline from NVS
+    prefs.begin(SGP_NAMESPACE, true);  // read-only
+    uint16_t eco2_base = prefs.getUShort(SGP_ECO2_KEY, 0);
+    uint16_t tvoc_base = prefs.getUShort(SGP_TVOC_KEY, 0);
+    prefs.end();
+    
+    if (eco2_base != 0 && tvoc_base != 0) {
+      sgp.setIAQBaseline(eco2_base, tvoc_base);
+      Serial.print("SGP30 baseline restored: eCO2=");
+      Serial.print(eco2_base);
+      Serial.print(", TVOC=");
+      Serial.println(tvoc_base);
+    } else {
+      Serial.println("No SGP30 baseline found in NVS");
+    }
   }
 
   // SGP30 warmup
@@ -152,6 +208,20 @@ void setup() {
     ppm = powf(10.0f, ((log_ratio - 0.35f) / -0.47f));
   }
   pkt.mq3_ppm = (isnan(ppm) || isinf(ppm)) ? NAN : ppm;
+  pkt.timestamp = millis();
+
+  // Save SGP30 baseline to NVS for next cycle
+  uint16_t eco2_base, tvoc_base;
+  if (sgp.getIAQBaseline(&eco2_base, &tvoc_base)) {
+    prefs.begin(SGP_NAMESPACE, false);  // read-write
+    prefs.putUShort(SGP_ECO2_KEY, eco2_base);
+    prefs.putUShort(SGP_TVOC_KEY, tvoc_base);
+    prefs.end();
+    Serial.print("SGP30 baseline saved: eCO2=");
+    Serial.print(eco2_base);
+    Serial.print(", TVOC=");
+    Serial.println(tvoc_base);
+  }
 
   if (NODE_ENABLE_HUMAN_OUTPUT) {
     Serial.println("[node1]");
@@ -172,6 +242,7 @@ void setup() {
   }
 
   esp_now_register_send_cb(onDataSent);
+  esp_now_register_recv_cb(onDataRecv);  // Listen for timing corrections
 
   esp_now_peer_info_t peerInfo{};
   memcpy(peerInfo.peer_addr, masterMac, 6);
@@ -186,13 +257,30 @@ void setup() {
 
   esp_err_t res = esp_now_send(masterMac, (uint8_t*)&pkt, sizeof(SensorPacket));
   if (res != ESP_OK) {
-    Serial.print("esp_now_send error: ");
+    Serial.print("[Node] esp_now_send error: ");
     Serial.println(res);
   } else {
-    Serial.println("Node packet sent via ESP-NOW");
+    Serial.println("[Node] Sensor packet sent via ESP-NOW");
   }
 
-  delay(200);  // give radio time to transmit
+  // Wait for timing correction from master (with timeout)
+  Serial.println("[Node] Waiting for timing correction from master...");
+  unsigned long waitStart = millis();
+  while (!receivedTimingCorrection && (millis() - waitStart < 2000)) {
+    delay(10);
+  }
+  
+  if (receivedTimingCorrection) {
+    sleepAdjustmentMs = timingCorrection.adjustmentMs;
+    Serial.print("[Node] Timing correction received and will be applied: ");
+    Serial.print(sleepAdjustmentMs);
+    Serial.println(" ms");
+  } else {
+    Serial.println("[Node] No timing correction received (timeout)");
+    sleepAdjustmentMs = 0;  // No adjustment
+  }
+
+  delay(100);  // give radio time to finish
 
   goToSleepForRemainingCycle();
 }
