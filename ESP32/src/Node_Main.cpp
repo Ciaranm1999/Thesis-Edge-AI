@@ -7,7 +7,7 @@
 #include <Preferences.h>
 
 // --------- General config ---------
-const uint32_t CYCLE_SECONDS      = 120;  // total cycle length (active + sleep)
+const uint32_t CYCLE_SECONDS      = 900;  // total cycle length (active + sleep) - 15 minutes
 const uint8_t  SGP_WARMUP_SECONDS = 45;   // SGP30 IAQmeasure() calls during warmup
 
 const bool NODE_ENABLE_HUMAN_OUTPUT  = true;

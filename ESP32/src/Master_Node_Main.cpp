@@ -18,9 +18,9 @@ const char* MQTT_TOPIC_NODE1 = "sensors/node1/data";
 const char* MQTT_TOPIC_NODE2 = "sensors/node2/data";
 
 // --------- General config ---------
-const uint32_t CYCLE_SECONDS          = 120;      // total cycle length (active + sleep)
+const uint32_t CYCLE_SECONDS          = 900;      // total cycle length (active + sleep) - 15 minutes
 const uint8_t  SGP_WARMUP_SECONDS     = 45;       // SGP30 warmup calls
-const uint32_t MASTER_LISTEN_WINDOW_MS = 30000;  // 30 s listen window (increased for better sync)
+const uint32_t MASTER_LISTEN_WINDOW_MS = 60000;  // 60 s listen window (longer for 15 min cycles)
 
 const bool DEBUG_PRINT_LOCAL_MAC      = false;
 const bool DEBUG_PRINT_TIMING         = true;
@@ -161,8 +161,8 @@ void sendTimingCorrection(const uint8_t *nodeMac, unsigned long arrivalTime) {
   int32_t correction = -error / 2;  // Apply 50% correction to avoid overcorrection
   
   // Limit correction to avoid extreme adjustments
-  if (correction > 5000) correction = 5000;    // max 5 seconds faster
-  if (correction < -5000) correction = -5000;  // max 5 seconds slower
+  if (correction > 10000) correction = 10000;    // max 10 seconds faster
+  if (correction < -10000) correction = -10000;  // max 10 seconds slower
   
   TimingPacket timingPkt;
   timingPkt.adjustmentMs = correction;
