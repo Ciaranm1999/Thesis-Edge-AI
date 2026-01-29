@@ -155,14 +155,29 @@ void sendTimingCorrection(const uint8_t *nodeMac, unsigned long arrivalTime) {
   // Target: nodes should arrive at the start of the listen window (listenStartMs)
   long error = (long)arrivalTime - (long)listenStartMs;
   
-  // Simple proportional correction: if node arrived late, tell it to sleep less
-  // If node arrived early, tell it to sleep more
-  // Negative error = early, positive error = late
-  int32_t correction = -error / 2;  // Apply 50% correction to avoid overcorrection
+  // Adaptive proportional correction with dead zone
+  int32_t correction = 0;
   
-  // Limit correction to avoid extreme adjustments
-  if (correction > 10000) correction = 10000;    // max 10 seconds faster
-  if (correction < -10000) correction = -10000;  // max 10 seconds slower
+  // Dead zone: don't correct if error is small enough (within ±500ms)
+  if (abs(error) < 500) {
+    correction = 0;  // Already synchronized, no correction needed
+  } else {
+    // Adaptive gain based on error magnitude
+    float gain;
+    if (abs(error) > 10000) {
+      gain = 0.5;   // Aggressive for large errors (>10s)
+    } else if (abs(error) > 5000) {
+      gain = 0.4;   // Moderate for medium errors (5-10s)
+    } else {
+      gain = 0.25;  // Gentle for small errors (<5s)
+    }
+    
+    correction = (int32_t)(-error * gain);
+    
+    // Limit correction to avoid extreme adjustments
+    if (correction > 10000) correction = 10000;    // max 10 seconds faster
+    if (correction < -10000) correction = -10000;  // max 10 seconds slower
+  }
   
   TimingPacket timingPkt;
   timingPkt.adjustmentMs = correction;
@@ -413,6 +428,10 @@ void goToSleepForRemainingCycle() {
     while (true) delay(1000);
   } else {
     uint64_t sleepUs = (uint64_t)remainingMs * 1000ULL;
+    Serial.println("\n");
+    Serial.println("###############################################################");
+    Serial.println("#                      CYCLE END - SLEEPING                   #");
+    Serial.println("###############################################################");
     Serial.println("Master going to deep sleep...");
     esp_sleep_enable_timer_wakeup(sleepUs);
     delay(50);
@@ -426,6 +445,10 @@ void setup() {
   delay(500);
   startMs = millis();
 
+  Serial.println("\n\n");
+  Serial.println("###############################################################");
+  Serial.println("#                      NEW CYCLE START                        #");
+  Serial.println("###############################################################");
   Serial.println("MASTER WAKEUP");
 
   // Load MQ3_R0 from NVS
