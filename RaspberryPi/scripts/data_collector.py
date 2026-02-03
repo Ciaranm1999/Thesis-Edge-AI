@@ -29,7 +29,7 @@ MQTT_TOPICS = [
 ]
 
 # Timing
-CAMERA_INTERVAL_SECONDS = 15 * 60  # 15 minutes
+CAMERA_INTERVAL_SECONDS = 30 * 60  # 30 minutes
 
 # GPIO Configuration
 LED_PIN = 17  # GPIO17 (BCM numbering)

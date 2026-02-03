@@ -20,7 +20,7 @@ const char* MQTT_TOPIC_NODE2 = "sensors/node2/data";
 // --------- General config ---------
 const uint32_t CYCLE_SECONDS          = 900;      // total cycle length (active + sleep) - 15 minutes
 const uint8_t  SGP_WARMUP_SECONDS     = 45;       // SGP30 warmup calls
-const uint32_t MASTER_LISTEN_WINDOW_MS = 60000;  // 60 s listen window (longer for 15 min cycles)
+const uint32_t MASTER_LISTEN_WINDOW_MS = 90000;  // 90 s listen window (after warmup)
 
 const bool DEBUG_PRINT_LOCAL_MAC      = false;
 const bool DEBUG_PRINT_TIMING         = true;
@@ -91,7 +91,11 @@ PubSubClient mqttClient(espClient);
 
 // --------- Timing ---------
 unsigned long startMs      = 0;
-unsigned long listenStartMs = 0;
+unsigned long listenStartMs = 0;  // Reference time = master wake
+unsigned long warmupEndMs = 0;    // Time when warmup completes
+
+// RTC memory to persist cycle count across deep sleep
+RTC_DATA_ATTR int cycleNumber = 0;  // Track cycle count (persists in deep sleep)
 
 // --------- MQ3 helper ---------
 float MQ3_getResistance() {
@@ -152,24 +156,38 @@ void printCSV(const char *label, const SensorPacket &p) {
 // --------- Timing Correction Logic ---------
 void sendTimingCorrection(const uint8_t *nodeMac, unsigned long arrivalTime) {
   // Calculate how early/late the node arrived
-  // Target: nodes should arrive at the start of the listen window (listenStartMs)
-  long error = (long)arrivalTime - (long)listenStartMs;
+  // Target: 50s after master wake (45s warmup + 5s buffer)
+  const long TARGET_ARRIVAL_MS = 50000;  // 50 seconds after master wake
+  long targetArrivalTime = (long)listenStartMs + TARGET_ARRIVAL_MS;
+  long error = (long)arrivalTime - targetArrivalTime;
   
-  // Adaptive proportional correction with dead zone
+  // Calculate arrival time relative to master wake
+  long arrivalTimeMs = (long)arrivalTime - (long)listenStartMs;
+  
+  // EMERGENCY PROTECTION: If node arrives during warmup, force correction
   int32_t correction = 0;
   
-  // Dead zone: don't correct if error is small enough (within ±500ms)
-  if (abs(error) < 500) {
-    correction = 0;  // Already synchronized, no correction needed
+  if (arrivalTimeMs < 45000) {
+    // Node arrived during warmup - calculate correction to push past target + 2s
+    long distanceToTarget = TARGET_ARRIVAL_MS - arrivalTimeMs;  // How far from 50s target
+    correction = distanceToTarget + 2000;  // Push to target + 2s extra
+    
+    // Clamp minimum correction to 5s (safety)
+    if (correction < 5000) correction = 5000;
+    
+    Serial.println("!!! EMERGENCY CORRECTION - NODE ARRIVED DURING WARMUP !!!");
+    Serial.print("Arrived at: "); Serial.print(arrivalTimeMs); Serial.println(" ms");
+    Serial.print("Target: "); Serial.print(TARGET_ARRIVAL_MS); Serial.println(" ms");
+    Serial.print("Pushing to: "); Serial.print(TARGET_ARRIVAL_MS + 2000); Serial.println(" ms");
   } else {
-    // Adaptive gain based on error magnitude
+    // Normal adaptive control when safe from zero
     float gain;
     if (abs(error) > 10000) {
       gain = 0.5;   // Aggressive for large errors (>10s)
     } else if (abs(error) > 5000) {
-      gain = 0.4;   // Moderate for medium errors (5-10s)
+      gain = 0.45;  // Moderate for medium errors (5-10s)
     } else {
-      gain = 0.25;  // Gentle for small errors (<5s)
+      gain = 0.4;   // Stronger for small errors (<5s) - promotes controlled oscillation
     }
     
     correction = (int32_t)(-error * gain);
@@ -184,6 +202,7 @@ void sendTimingCorrection(const uint8_t *nodeMac, unsigned long arrivalTime) {
   
   if (DEBUG_PRINT_TIMING) {
     Serial.println("\n----- TIMING CORRECTION -----");
+    Serial.print("Arrival time: "); Serial.print(arrivalTimeMs); Serial.println(" ms into window");
     Serial.print("Node arrival error: ");
     Serial.print(error);
     Serial.println(" ms");
@@ -444,12 +463,14 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   startMs = millis();
+  listenStartMs = millis();  // Set reference time at master wake (before warmup)
+  cycleNumber++;  // Increment cycle counter
 
   Serial.println("\n\n");
   Serial.println("###############################################################");
   Serial.println("#                      NEW CYCLE START                        #");
   Serial.println("###############################################################");
-  Serial.println("MASTER WAKEUP");
+  Serial.printf("MASTER WAKEUP - Cycle #%d\n", cycleNumber);
 
   // Load MQ3_R0 from NVS
   prefs.begin(PREFS_NAMESPACE, true); // read-only
@@ -539,6 +560,8 @@ void setup() {
     }
     delay(1000);
   }
+  
+  warmupEndMs = millis();  // Mark when warmup completes
 
   // DHT22
   float t = dht.readTemperature();
@@ -561,10 +584,9 @@ void setup() {
 
   // Listen for node packets
   Serial.println("Master listening for node packets...");
-  listenStartMs = millis();
 
   while (true) {
-    unsigned long elapsed = millis() - listenStartMs;
+    unsigned long elapsed = millis() - warmupEndMs;  // Time since warmup ended
 
     // Condition 1: both nodes have reported -> stop early
     if (node1ReceivedThisCycle && node2ReceivedThisCycle) {
@@ -572,7 +594,7 @@ void setup() {
       break;
     }
 
-    // Condition 2: listen window expired -> stop
+    // Condition 2: listen window expired -> stop (60s after warmup ends)
     if (elapsed >= MASTER_LISTEN_WINDOW_MS) {
       Serial.println("Listen window expired, ending listen.");
       break;
