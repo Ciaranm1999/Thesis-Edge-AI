@@ -5,17 +5,13 @@
 #include "DHT.h"
 #include "Adafruit_SGP30.h"
 #include <Preferences.h>
-#include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-// --------- WiFi & MQTT Configuration ---------
-const char* WIFI_SSID = "RaspberryPi_AP";         // <-- Pi's AP SSID
-const char* WIFI_PASSWORD = "YOUR_AP_PASSWORD";   // <-- Pi's AP Password
-const char* MQTT_BROKER = "192.168.4.1";          // <-- Pi's AP IP (default for hostapd)
-const int   MQTT_PORT = 1883;
-const char* MQTT_TOPIC_MASTER = "sensors/master/data";
-const char* MQTT_TOPIC_NODE1 = "sensors/node1/data";
-const char* MQTT_TOPIC_NODE2 = "sensors/node2/data";
+// --------- UART Configuration ---------
+// UART2 pins for Raspberry Pi communication
+#define UART_RX_PIN 16  // GPIO16 - connect to Pi TX (Pin 8)
+#define UART_TX_PIN 17  // GPIO17 - connect to Pi RX (Pin 10)
+#define UART_BAUD 115200
 
 // --------- General config ---------
 const uint32_t CYCLE_SECONDS          = 900;      // total cycle length (active + sleep) - 15 minutes
@@ -83,11 +79,7 @@ unsigned long node2ArrivalTime = 0;
 
 // --------- Node MAC addresses ---------
 uint8_t node1Mac[] = { 0xE0, 0x8C, 0xFE, 0x2D, 0xD8, 0x60 }; // Node 1 MAC: E0:8C:FE:2D:D8:60
-uint8_t node2Mac[] = { 0x7C, 0x9E, 0xBD, 0x45, 0x2A, 0xB4 }; // Node 2 MAC: 7C:9E:BD:45:2A:B4
-
-// --------- WiFi & MQTT Clients ---------
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
+uint8_t node2Mac[] = { 0xE0, 0x8C, 0xFE, 0x5E, 0x1B, 0x8C }; // Node 2 MAC: E0:8C:FE:5E:1B:8C
 
 // --------- Timing ---------
 unsigned long startMs      = 0;
@@ -323,72 +315,59 @@ void onDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
   }
 }
 
-// --------- WiFi Connection ---------
-void connectWiFi() {
-  Serial.print("Connecting to Pi's WiFi AP");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+// --------- Send Data via UART to Raspberry Pi ---------
+void sendDataToRaspberryPi() {
+  Serial.println("\n=== Sending data to Raspberry Pi via UART ===");
   
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-  }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✓ WiFi connected to Pi's AP");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n✗ WiFi connection failed!");
-  }
-}
-
-// --------- MQTT Connection ---------
-void connectMQTT() {
-  Serial.print("Connecting to MQTT broker");
-  
-  int attempts = 0;
-  while (!mqttClient.connected() && attempts < 10) {
-    if (mqttClient.connect("ESP32_Master")) {
-      Serial.println("\n✓ MQTT connected");
-      return;
-    }
-    Serial.print(".");
-    delay(500);
-    attempts++;
-  }
-  
-  if (!mqttClient.connected()) {
-    Serial.println("\n✗ MQTT connection failed!");
-  }
-}
-
-// --------- Send Data to MQTT ---------
-void sendToMQTT(const char* topic, const SensorPacket &pkt) {
-  if (!mqttClient.connected()) {
-    Serial.println("MQTT not connected, skipping send");
-    return;
-  }
-  
-  StaticJsonDocument<256> doc;
-  doc["temperature"] = pkt.temp;
-  doc["humidity"] = pkt.hum;
-  doc["tvoc"] = pkt.tvoc;
-  doc["eco2"] = pkt.eco2;
-  doc["mq3_ppm"] = pkt.mq3_ppm;
+  StaticJsonDocument<768> doc;
+  doc["cycle"] = cycleNumber;
   doc["timestamp"] = millis();
   
-  char buffer[256];
-  serializeJson(doc, buffer);
+  // Master data
+  JsonObject master = doc.createNestedObject("master");
+  master["temp"] = masterPkt.temp;
+  master["hum"] = masterPkt.hum;
+  master["tvoc"] = masterPkt.tvoc;
+  master["eco2"] = masterPkt.eco2;
+  master["mq3_ppm"] = masterPkt.mq3_ppm;
+  master["received"] = true;
   
-  if (mqttClient.publish(topic, buffer)) {
-    Serial.print("✓ Published to ");
-    Serial.println(topic);
+  // Node1 data
+  JsonObject node1 = doc.createNestedObject("node1");
+  if (node1ReceivedThisCycle) {
+    node1["temp"] = node1Pkt.temp;
+    node1["hum"] = node1Pkt.hum;
+    node1["tvoc"] = node1Pkt.tvoc;
+    node1["eco2"] = node1Pkt.eco2;
+    node1["mq3_ppm"] = node1Pkt.mq3_ppm;
+    node1["received"] = true;
   } else {
-    Serial.print("✗ Failed to publish to ");
-    Serial.println(topic);
+    node1["received"] = false;
+  }
+  
+  // Node2 data
+  JsonObject node2 = doc.createNestedObject("node2");
+  if (node2ReceivedThisCycle) {
+    node2["temp"] = node2Pkt.temp;
+    node2["hum"] = node2Pkt.hum;
+    node2["tvoc"] = node2Pkt.tvoc;
+    node2["eco2"] = node2Pkt.eco2;
+    node2["mq3_ppm"] = node2Pkt.mq3_ppm;
+    node2["received"] = true;
+  } else {
+    node2["received"] = false;
+  }
+  
+  // Serialize and send
+  String output;
+  serializeJson(doc, output);
+  Serial2.println(output);  // Send to Pi via UART2
+  
+  Serial.println("✓ Data sent to Raspberry Pi");
+  if (DEBUG_PRINT_TIMING) {
+    Serial.print("JSON size: ");
+    Serial.print(output.length());
+    Serial.println(" bytes");
   }
 }
 
@@ -485,56 +464,9 @@ void setup() {
   Serial.print(MQ3_R0, 2);
   Serial.println(" ohms");
 
-  // ===== WiFi/MQTT DISABLED FOR ESP-NOW TESTING =====
-  // Uncomment below when Raspberry Pi is ready
-  /*
-// --------- Connect to Pi and send data via MQTT ---------
-  Serial.println("\n=== Connecting to Raspberry Pi ===");
-  
-  // Disconnect ESP-NOW to switch to WiFi STA mode fully
-  esp_now_deinit();
-  
-  // Connect to Pi's WiFi AP
-  connectWiFi();
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    // Setup MQTT
-    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    connectMQTT();
-    
-    if (mqttClient.connected()) {
-      // Send master's data
-      Serial.println("Sending master data...");
-      sendToMQTT(MQTT_TOPIC_MASTER, masterPkt);
-      
-      // Send node1 data if received
-      if (node1ReceivedThisCycle) {
-        Serial.println("Sending node1 data...");
-        sendToMQTT(MQTT_TOPIC_NODE1, node1Pkt);
-      } else {
-        Serial.println("⚠ Node1 data not received this cycle");
-      }
-      
-      // Send node2 data if received
-      if (node2ReceivedThisCycle) {
-        Serial.println("Sending node2 data...");
-        sendToMQTT(MQTT_TOPIC_NODE2, node2Pkt);
-      } else {
-        Serial.println("⚠ Node2 data not received this cycle");
-      }
-      
-      // Allow time for MQTT messages to be sent
-      delay(500);
-      mqttClient.disconnect();
-    }
-    
-    WiFi.disconnect();
-  }
-  
-  Serial.println("=== Master cycle complete ===\n");
-  */
-
-  Serial.println("\n[WiFi/MQTT disabled - ESP-NOW testing mode]\n");
+  // Initialize UART2 for Raspberry Pi communication
+  Serial2.begin(UART_BAUD, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
+  Serial.println("UART2 initialized for Raspberry Pi (GPIO16 RX, GPIO17 TX)");
   
   analogReadResolution(12);
 
@@ -635,6 +567,10 @@ void setup() {
     
     Serial.println("============================================\n");
   }
+
+  // Send all collected data to Raspberry Pi via UART
+  sendDataToRaspberryPi();
+  delay(100);  // Allow UART transmission to complete
 
   goToSleepForRemainingCycle();
 }

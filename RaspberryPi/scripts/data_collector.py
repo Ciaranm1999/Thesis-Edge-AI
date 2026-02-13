@@ -29,7 +29,7 @@ MQTT_TOPICS = [
 ]
 
 # Timing
-CAMERA_INTERVAL_SECONDS = 30 * 60  # 30 minutes
+CAMERA_INTERVAL_SECONDS = 60 * 60  # 60 minutes
 
 # GPIO Configuration
 LED_PIN = 17  # GPIO17 (BCM numbering)
@@ -104,7 +104,7 @@ class CameraController:
             
             # Turn LED on
             GPIO.output(LED_PIN, GPIO.HIGH)
-            time.sleep(0.5)  # Let LED stabilize
+            time.sleep(2)  # Let LED stabilize and camera focus
             
             # Capture image
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

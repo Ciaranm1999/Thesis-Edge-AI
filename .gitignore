@@ -1,0 +1,33 @@
+# Test images and captured data
+*.jpg
+*.jpeg
+*.png
+RaspberryPi/RaspberryPiData/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+ENV/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Temporary files
+*.tmp
+*.bak
+*.backup

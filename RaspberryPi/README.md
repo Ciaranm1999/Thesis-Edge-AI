@@ -7,7 +7,8 @@ This directory contains code and setup instructions for the Raspberry Pi compone
 ```
 RaspberryPi/
 ├── scripts/              # Main scripts and utilities
-│   ├── data_collector.py       # Main MQTT data collection service
+│   ├── uart_data_collector.py  # Main UART data collection service
+│   ├── data_collector.py       # Legacy MQTT collector (archived)
 │   ├── setup_system.sh         # System setup script
 │   ├── setup_autologin.sh      # Auto-login configuration
 │   └── Connect-RaspberryPi.ps1 # Windows connection helper
@@ -18,12 +19,13 @@ RaspberryPi/
 ├── services/             # Systemd service files
 │   └── thesis-data-collector.service
 ├── docs/                 # Documentation
-│   ├── QUICK_START.md          # 10-minute setup guide ⚡
-│   ├── MQTT_SETUP_GUIDE.md     # Complete documentation 📖
-│   ├── README_MQTT.md          # MQTT system overview
+│   ├── UART_SETUP_GUIDE.md     # UART connection guide (PRIMARY) ⚡
+│   ├── SETUP_AND_DATA_GUIDE.md # Data storage & system setup
+│   ├── QUICK_START.md          # 10-minute setup guide
 │   ├── FIRST_TIME_SETUP.md     # Initial Pi setup
 │   ├── SSH_SETUP.md            # SSH configuration
-│   └── RUN_TESTS.md            # Hardware testing guide
+│   ├── RUN_TESTS.md            # Hardware testing guide
+│   └── archive_mqtt/           # Old MQTT documentation (for reference)
 ├── config/               # Configuration files
 │   └── pyrightconfig.json      # Python type checking config
 └── camera_images/        # Test image output directory
@@ -34,50 +36,64 @@ RaspberryPi/
 - **Raspberry Pi** (Model 3/4/5)
 - **Camera Module 3** (12MP, autofocus)
 - **LEDs** for status indication
+- **UART Connection to ESP32** (GPIO14/15)
 
 ## 🚀 Quick Start
 
-### 1. Run Setup Script
+### 1. Configure UART (One-Time Setup)
+See [docs/UART_SETUP_GUIDE.md](docs/UART_SETUP_GUIDE.md) for detailed wiring and configuration.
+
+**Quick version:**
 ```bash
-cd ~/Thesis-Edge-AI/RaspberryPi/scripts
-chmod +x setup_system.sh
-./setup_system.sh
+# Disable serial console
+sudo nano /boot/cmdline.txt  # Remove console=serial0,115200
+sudo nano /boot/config.txt   # Add: enable_uart=1
+
+# Reboot
+sudo reboot
 ```
 
-### 2. Enable Auto-Login
+### 2. Install UART Data Collector
 ```bash
-chmod +x setup_autologin.sh
-./setup_autologin.sh
-sudo reboot
+cd ~/Thesis-Edge-AI/RaspberryPi/scripts
+
+# Test manually first
+python3 uart_data_collector.py
+
+# Install as service
+sudo cp ../services/thesis-uart-collector.service /etc/systemd/system/
+sudo systemctl enable thesis-uart-collector
+sudo systemctl start thesis-uart-collector
 ```
 
 ### 3. Verify Everything Works
 ```bash
 # Check service
-sudo systemctl status thesis-data-collector
+sudo systemctl status thesis-uart-collector
 
-# Watch for MQTT messages
-mosquitto_sub -h localhost -t "sensors/#" -v
+# View logs
+tail -f ~/thesis_data/uart_data_collector.log
 
 # Check collected data
-ls -lh ~/thesis_data/
+ls -lh ~/thesis_data/sensor_data/
+cat ~/thesis_data/sensor_data/unified_sensor_data.csv
 ```
 
 ## 🔧 Common Commands
 
 ```bash
 # Service management
-sudo systemctl start thesis-data-collector
-sudo systemctl stop thesis-data-collector
-sudo systemctl restart thesis-data-collector
-sudo systemctl status thesis-data-collector
+sudo systemctl start thesis-uart-collector
+sudo systemctl stop thesis-uart-collector
+sudo systemctl restart thesis-uart-collector
+sudo systemctl status thesis-uart-collector
 
 # View logs
-journalctl -u thesis-data-collector -f
-tail -f ~/thesis_data/data_collector.log
+journalctl -u thesis-uart-collector -f
+tail -f ~/thesis_data/uart_data_collector.log
 
-# Test MQTT
-mosquitto_sub -h localhost -t "sensors/#" -v
+# Monitor UART directly
+cat /dev/ttyAMA0
 
 # Test hardware
 cd ~/Thesis-Edge-AI/RaspberryPi/tests
@@ -88,16 +104,16 @@ python3 led_test.py
 ## 📚 Documentation
 
 For detailed setup and usage instructions, see:
+- **[docs/UART_SETUP_GUIDE.md](docs/UART_SETUP_GUIDE.md)** - UART wiring & configuration (PRIMARY)
+- **[docs/SETUP_AND_DATA_GUIDE.md](docs/SETUP_AND_DATA_GUIDE.md)** - Data storage format & locations
 - **[docs/QUICK_START.md](docs/QUICK_START.md)** - Fast setup guide
-- **[docs/MQTT_SETUP_GUIDE.md](docs/MQTT_SETUP_GUIDE.md)** - Complete system documentation
-- **[docs/README_MQTT.md](docs/README_MQTT.md)** - MQTT system overview
 - **[docs/RUN_TESTS.md](docs/RUN_TESTS.md)** - Hardware testing procedures
 
 ## 🎯 System Features
 
 ### Data Collection
-- ✅ Receives sensor data from ESP32 nodes via MQTT
-- ✅ Saves data to daily CSV files
+- ✅ Receives sensor data from ESP32 Master via UART
+- ✅ Saves all 3 nodes (master, node1, node2) to unified CSV format
 - ✅ Separate file for each node (master, node1, node2)
 - ✅ Timestamped entries
 
@@ -113,41 +129,37 @@ For detailed setup and usage instructions, see:
 - ✅ Reconnects to MQTT if connection lost
 - ✅ Comprehensive logging for debugging
 
-## 🌐 MQTT Topics
-
-The system listens to:
-- `sensors/master/data` - Master node data
-- `sensors/node1/data` - Node 1 data  
-- `sensors/node2/data` - Node 2 data
-
 ## 📁 Data Storage
 
 All data saved to `~/thesis_data/`:
 ```
 thesis_data/
 ├── sensor_data/
-│   ├── master_20260126.csv
-│   ├── node1_20260126.csv
-│   └── node2_20260126.csv
+│   └── unified_sensor_data.csv  # All 3 nodes in one file
 ├── images/
-│   ├── capture_20260126_120000.jpg
+│   ├── capture_20260205_120000.jpg
 │   └── ...
-└── data_collector.log
+└── uart_data_collector.log
+```
+
+**Unified CSV Format:**
+```csv
+timestamp,cycle_number,master_temp,master_hum,master_tvoc,master_eco2,master_mq3_ppm,node1_temp,node1_hum,node1_tvoc,node1_eco2,node1_mq3_ppm,node2_temp,node2_hum,node2_tvoc,node2_eco2,node2_mq3_ppm
+2026-02-05 12:00:00,42,22.5,45.2,150,400,0.5,22.3,46.1,148,395,0.48,22.6,45.8,152,402,0.52
 ```
 
 ## 🎓 For Thesis
 
 This system demonstrates:
-- Edge device communication protocols (MQTT)
-- Autonomous data collection
-- Power-efficient ESP32 operation (deep sleep)
-- Multi-sensor data fusion
-- Image capture for AI model training
+- Direct serial communication (UART) between edge devices
+- Autonomous data collection with minimal power consumption
+- Unified data format optimized for ML model training
+- Multi-sensor data fusion across distributed nodes
+- Image capture synchronized with sensor readings
 
-Future branches will implement:
-- BLE communication (ultra-low power)
-- UART communication (lowest power)
-- Edge AI inference on Raspberry Pi
+## 🛠️ Useful Commands
+
+### System Info
 ```bash
 # Check Raspberry Pi model
 cat /proc/cpuinfo | grep Model
