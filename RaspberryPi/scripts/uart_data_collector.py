@@ -133,7 +133,7 @@ class CameraController:
         """Initialize camera with autofocus"""
         try:
             if not self.initialized:
-                self.picam2 = Picamera2()
+                self.picam2 = Picamera2(camera_num=0)  # Use CAM0 slot
                 config = self.picam2.create_still_configuration()
                 self.picam2.configure(config)
                 
@@ -149,53 +149,110 @@ class CameraController:
             self.initialized = False
     
     def capture_with_led(self):
-        """Capture image with LED on and autofocus"""
+        """Capture image with LED on and adaptive autofocus delay based on lighting"""
         try:
             if not self.initialized:
                 self.initialize()
             
+            if not self.initialized:
+                logger.error("Camera not initialized, skipping capture")
+                return False
+            
             # Turn LED on
             led_on()
-            logger.info("LED ON")
+            logger.info("LED ON - Analyzing lighting conditions...")
             
-            # Trigger autofocus and wait for it to complete
+            # Wait briefly for LED to stabilize
+            time.sleep(0.5)
+            
+            # Detect lighting conditions to determine optimal focus delay
+            try:
+                metadata = self.picam2.capture_metadata()
+                exposure_time = metadata.get('ExposureTime', 0)  # microseconds
+                analogue_gain = metadata.get('AnalogueGain', 1.0)
+                
+                # Low light detection:
+                # High exposure time (>20ms) or high gain (>4.0) indicates low light
+                is_low_light = (exposure_time > 20000) or (analogue_gain > 4.0)
+                
+                if is_low_light:
+                    focus_delay = 6  # Longer delay for low light
+                    logger.info(f"Low light detected (Exposure: {exposure_time/1000:.1f}ms, Gain: {analogue_gain:.2f}x) - using {focus_delay}s focus delay")
+                else:
+                    focus_delay = 3  # Standard delay for good light
+                    logger.info(f"Good lighting (Exposure: {exposure_time/1000:.1f}ms, Gain: {analogue_gain:.2f}x) - using {focus_delay}s focus delay")
+                    
+            except Exception as detect_err:
+                # Fallback to longer delay if detection fails
+                focus_delay = 5
+                logger.warning(f"Could not detect lighting conditions: {detect_err} - using default {focus_delay}s delay")
+            
+            # Trigger autofocus
             try:
                 self.picam2.set_controls({"AfTrigger": 0})
                 logger.info("Autofocus triggered")
             except Exception as af_err:
                 logger.warning(f"Autofocus trigger failed: {af_err}")
             
-            time.sleep(3)  # Wait for autofocus to complete and LED to stabilize
+            # Adaptive delay based on lighting
+            time.sleep(focus_delay)
             
-            # Check focus status
+            # Check final focus status
             try:
                 metadata = self.picam2.capture_metadata()
                 if 'AfState' in metadata:
                     af_states = {0: "Idle", 1: "Scanning", 2: "Focused", 3: "Failed"}
-                    logger.info(f"Autofocus state: {af_states.get(metadata['AfState'], 'Unknown')}")
+                    logger.info(f"AF State: {af_states.get(metadata['AfState'], 'Unknown')}")
                 if 'LensPosition' in metadata:
-                    logger.info(f"Lens position: {metadata['LensPosition']:.2f}")
+                    logger.info(f"Lens Position: {metadata['LensPosition']:.2f}")
             except Exception as meta_err:
                 logger.warning(f"Could not read AF metadata: {meta_err}")
             
-            # Capture image
+            # Capture image with timeout protection
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = IMAGE_DIR / f"capture_{timestamp}.jpg"
             
-            self.picam2.capture_file(str(filename))
+            try:
+                # Attempt capture
+                self.picam2.capture_file(str(filename))
+                
+                # Verify file was created
+                if filename.exists():
+                    file_size = filename.stat().st_size / 1024  # KB
+                    logger.info(f"✓ Captured: {filename.name} ({file_size:.2f} KB)")
+                    success = True
+                else:
+                    logger.error("Capture file not created")
+                    success = False
+                    
+            except Exception as capture_err:
+                logger.error(f"Capture file operation failed: {capture_err}")
+                success = False
             
-            # Turn LED off immediately after capture
+            # ALWAYS turn LED off
             led_off()
             logger.info("LED OFF - Capture complete")
             
-            file_size = filename.stat().st_size / 1024  # KB
-            logger.info(f"Captured image: {filename.name} ({file_size:.2f} KB)")
-            
-            return True
+            return success
             
         except Exception as e:
-            led_off()  # Make sure LED is off on error
+            # Emergency LED off - ensure it's always turned off
+            try:
+                led_off()
+                logger.info("LED OFF - Error recovery")
+            except:
+                pass
             logger.error(f"Camera capture failed: {e}")
+            
+            # Try to reinitialize camera for next attempt
+            try:
+                logger.info("Attempting to reinitialize camera...")
+                self.cleanup()
+                time.sleep(2)
+                self.initialize()
+            except Exception as reinit_err:
+                logger.error(f"Camera reinitialization failed: {reinit_err}")
+            
             return False
     
     def cleanup(self):
@@ -312,17 +369,31 @@ def read_uart_data(ser):
 
 # ==================== Camera Timer Thread ====================
 def camera_timer_thread():
-    """Independent thread that captures images every 30 minutes"""
+    """Independent thread that captures images every 60 minutes"""
     logger.info(f"Camera timer started - capturing every {CAMERA_INTERVAL_SECONDS}s")
-    logger.info(f"First capture will occur in {CAMERA_INTERVAL_SECONDS}s")
+    
+    # Capture IMMEDIATELY on startup
+    logger.info("Taking initial photo on startup...")
+    try:
+        time.sleep(5)  # Brief delay to ensure camera is ready
+        camera.capture_with_led()
+    except Exception as e:
+        logger.error(f"Initial capture error: {e}")
+    
+    logger.info(f"Next captures will occur every {CAMERA_INTERVAL_SECONDS}s")
     
     while True:
         try:
-            # Wait FIRST, then capture (don't capture on startup)
+            # Wait for interval, then capture
             time.sleep(CAMERA_INTERVAL_SECONDS)
             camera.capture_with_led()
         except Exception as e:
             logger.error(f"Camera timer error: {e}")
+            # Ensure LED is off after error
+            try:
+                led_off()
+            except:
+                pass
             time.sleep(60)  # Wait 1 minute before retry
 
 # ==================== Main ====================
