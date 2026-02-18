@@ -4,6 +4,10 @@
 *.png
 RaspberryPi/RaspberryPiData/
 
+# Energy consumption data (PPK2 measurements - stored locally)
+energy_data/
+**/energy_data/
+
 # Python
 __pycache__/
 *.py[cod]
