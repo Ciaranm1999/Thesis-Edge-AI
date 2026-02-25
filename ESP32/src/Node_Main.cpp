@@ -143,6 +143,10 @@ void setup() {
   delay(500);
   startMs = millis();
 
+  // Energy optimizations
+  btStop();                    // Disable Bluetooth - not used
+  setCpuFrequencyMhz(80);      // Reduce CPU from 240MHz to 80MHz
+
   Serial.println("NODE WAKEUP");
 
   // Load MQ3_R0 from NVS

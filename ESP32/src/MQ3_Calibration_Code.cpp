@@ -48,33 +48,46 @@ void setup() {
   Serial.println("MQ3 Calibration Sketch");
   Serial.println("----------------------");
   Serial.println("Make sure the sensor is in clean reference air.");
-  Serial.println("Collecting samples...");
-
+  Serial.println("Starting calibration...\n");
+  
   analogReadResolution(12);  // ensure 12-bit ADC (0-4095)
+  analogSetAttenuation(ADC_11db);  // Set ADC attenuation to 11dB (0-3.3V range)
 
-  const int NUM_SAMPLES = 50;
+  const int NUM_SAMPLES = 30;
   float rsSum = 0.0f;
   int validCount = 0;
 
   for (int i = 0; i < NUM_SAMPLES; i++) {
+    // Read raw ADC and show voltages for debugging
+    int adc = analogRead(MQ3_PIN);
+    float v_adc = (adc / ADC_MAX) * ADC_REF;
+    float v_out = v_adc / DIVIDER_RATIO;
+    
+    Serial.print("Sample ");
+    Serial.print(i + 1);
+    Serial.print("/");
+    Serial.print(NUM_SAMPLES);
+    Serial.print(": ADC=");
+    Serial.print(adc);
+    Serial.print(", V_adc=");
+    Serial.print(v_adc, 3);
+    Serial.print("V, V_out=");
+    Serial.print(v_out, 3);
+    Serial.print("V");
+    
     float rs = MQ3_getResistance();
 
     if (!isnan(rs) && rs > 0.0f) {
       rsSum += rs;
       validCount++;
-
-      Serial.print("Sample ");
-      Serial.print(i);
-      Serial.print(": Rs = ");
+      Serial.print(" -> Rs = ");
       Serial.print(rs, 2);
       Serial.println(" ohms");
     } else {
-      Serial.print("Sample ");
-      Serial.print(i);
-      Serial.println(": INVALID (NaN or <= 0), skipped");
+      Serial.println(" -> INVALID (out of range)");
     }
 
-    delay(500);  // spacing between samples
+    delay(2000);  // 2 seconds between samples for stability
   }
 
   if (validCount == 0) {

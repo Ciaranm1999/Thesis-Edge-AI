@@ -445,6 +445,10 @@ void setup() {
   listenStartMs = millis();  // Set reference time at master wake (before warmup)
   cycleNumber++;  // Increment cycle counter
 
+  // Energy optimizations
+  btStop();                    // Disable Bluetooth - not used
+  setCpuFrequencyMhz(80);      // Reduce CPU from 240MHz to 80MHz
+
   Serial.println("\n\n");
   Serial.println("###############################################################");
   Serial.println("#                      NEW CYCLE START                        #");

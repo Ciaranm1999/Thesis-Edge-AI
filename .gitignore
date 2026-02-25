@@ -3,6 +3,7 @@
 *.jpeg
 *.png
 RaspberryPi/RaspberryPiData/
+Pi_Downloads/
 
 # Energy consumption data (PPK2 measurements - stored locally)
 energy_data/
@@ -19,12 +20,21 @@ __pycache__/
 venv/
 ENV/
 
+# Jupyter Notebooks
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+*.ipynb_checkpoints
+
 # VS Code
 .vscode/
 *.code-workspace
 
 # Logs
 *.log
+
+# CSV Data files (except example data)
+*.csv
+!**/example*.csv
 
 # OS
 .DS_Store
@@ -35,3 +45,8 @@ Thumbs.db
 *.tmp
 *.bak
 *.backup
+
+# Analysis outputs
+**/analysis_output.txt
+**/*_timeseries.png
+**/*_distributions.png

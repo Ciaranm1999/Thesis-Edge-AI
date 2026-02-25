@@ -41,10 +41,14 @@ CAMERA_INTERVAL_SECONDS = 60 * 60  # 60 minutes
 LED_PIN = 17  # GPIO17 (BCM numbering)
 gpio_handle = None  # Global handle for lgpio
 
+# Test/Batch Configuration
+# Set TEST_ID environment variable to specify batch: export TEST_ID=batch2
+TEST_ID = os.environ.get("TEST_ID", "batch2")  # Default to batch2
+
 # Data directories
 BASE_DIR = Path.home() / "thesis_data"
-DATA_DIR = BASE_DIR / "sensor_data"
-IMAGE_DIR = BASE_DIR / "images"
+DATA_DIR = BASE_DIR / "sensor_data" / TEST_ID
+IMAGE_DIR = BASE_DIR / "images" / TEST_ID
 
 # Logging
 LOG_FILE = BASE_DIR / "uart_data_collector.log"
@@ -74,6 +78,7 @@ def setup_directories():
     """Create necessary directories"""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Test/Batch ID: {TEST_ID}")
     logger.info(f"Data directory: {DATA_DIR}")
     logger.info(f"Image directory: {IMAGE_DIR}")
 

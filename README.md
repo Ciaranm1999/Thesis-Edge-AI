@@ -103,7 +103,7 @@ See [RaspberryPi/docs/UART_SETUP_GUIDE.md](RaspberryPi/docs/UART_SETUP_GUIDE.md)
 Use the PowerShell script to download all sensor data, images, and logs from the Pi to your local machine:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Download-PiData.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\Download-PiData.ps1
 ```
 
 **⚠️ Important:** The download path in `Download-PiData.ps1` is configured for a specific external location. 
@@ -118,6 +118,21 @@ The script will create three subdirectories:
 - `sensor_data/` - CSV files with unified sensor readings
 - `images/` - JPG images from camera captures
 - `logs/` - System log files
+
+## Starting Batch Data Collection
+
+To start a new batch experiment (e.g., batch2, batch3):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Start-Batch2.ps1
+```
+
+This script will automatically:
+- Deploy the updated data collector to the Pi
+- Create batch-specific directories
+- Start data collection in the background
+
+Data will be saved to `~/thesis_data/sensor_data/batch2/` and `~/thesis_data/images/batch2/` on the Pi.
 
 ## Data Format
 
