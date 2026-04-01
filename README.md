@@ -1,8 +1,12 @@
 # Thesis-Edge-AI
 
-## Multi-Node Environmental Monitoring System with Edge AI
+Multi-node environmental monitoring system with on-device ML inference, built for MSc research comparing edge AI frameworks on ESP32 hardware.
 
-This repository contains the complete implementation of a distributed sensor network for environmental monitoring, combining ESP32 nodes with Raspberry Pi for data collection and edge AI processing.
+## Overview
+
+Three ESP32 nodes collect temperature, humidity, TVOC, eCO2, and alcohol sensor readings every 15 minutes via ESP-NOW. The master node forwards data to a Raspberry Pi over UART, where it is logged to CSV and paired with camera images. A separate ML training pipeline produces models that are deployed back to the ESP32 for on-device inference, with energy profiled using a Nordic PPK2.
+
+The research focus is comparing AIfES, TensorFlow Lite Micro (TFLM), and TinyOL as inference frameworks for mould-risk prediction in agricultural and logistics contexts.
 
 ## System Architecture
 
@@ -13,193 +17,148 @@ This repository contains the complete implementation of a distributed sensor net
 │  (Sensors)  │    │  (Sensors)  │    │  (Sensors)  │
 └──────┬──────┘    └──────┬──────┘    └──────┬──────┘
        │                  │                   │
-       └──────ESP-NOW─────┴───────ESP-NOW────┤
+       └──────ESP-NOW─────┴───────ESP-NOW─────┤
                                               │
                                         UART (GPIO16/17)
                                               │
                                               ▼
                                    ┌──────────────────┐
                                    │  Raspberry Pi    │
-                                   │  - Data Storage  │
-                                   │  - Camera        │
-                                   │  - Edge AI       │
+                                   │  Data Storage    │
+                                   │  Camera          │
+                                   │  Edge AI         │
                                    └──────────────────┘
 ```
 
-## Features
-
-### ESP32 Network
-- ✅ **3-Node Configuration:** 1 Master + 2 Slave nodes
-- ✅ **ESP-NOW Communication:** Low-power wireless between nodes
-- ✅ **Synchronized Data Collection:** All nodes wake on 15-minute cycle
-- ✅ **Power Efficient:** Deep sleep between cycles (~10µA)
-- ✅ **Multi-Sensor:** DHT22 (temp/humidity), SGP30 (TVOC/eCO2), MQ3 (alcohol)
-
-### Raspberry Pi Hub
-- ✅ **UART Data Reception:** Direct serial from ESP32 Master
-- ✅ **Unified Data Storage:** All 3 nodes in single CSV (ML-ready)
-- ✅ **Camera Integration:** Synchronized image capture
-- ✅ **Auto-Start Service:** Runs on boot
-- ✅ **Edge AI Ready:** Platform for model inference
-
-## Project Structure
+## Repository Structure
 
 ```
 Thesis-Edge-AI/
-├── ESP32/                    # ESP32 firmware
+├── ESP32/
 │   ├── src/
-│   │   ├── Master_Node_Main.cpp    # Master with UART output
-│   │   └── Node_Main.cpp           # Slave node firmware
-│   ├── overnight_analysis/         # Stability testing data
+│   │   ├── Master_Node_Main.cpp     # Master node: sensor + UART output
+│   │   ├── Node_Main.cpp            # Slave node firmware
+│   │   ├── aifes_inference.cpp      # AIfES inference stub
+│   │   └── tflm_inference.cpp       # TF Lite Micro inference stub
+│   ├── include/
+│   ├── lib/
 │   └── platformio.ini
 │
-├── RaspberryPi/              # Raspberry Pi code
+├── RaspberryPi/
 │   ├── scripts/
-│   │   ├── uart_data_collector.py  # Main data collector
-│   │   └── web_dashboard.py        # Data visualization
-│   ├── docs/
-│   │   ├── UART_SETUP_GUIDE.md     # Wiring & configuration
-│   │   └── SETUP_AND_DATA_GUIDE.md # System setup
-│   └── tests/                      # Hardware tests
+│   │   ├── uart_data_collector.py   # Main data collection service
+│   │   ├── web_dashboard.py         # Live data visualization
+│   │   └── Download-BatchData.ps1   # Data download from Pi to local
+│   ├── analysis/
+│   │   ├── batch_analysis.ipynb     # Per-batch sensor analysis
+│   │   └── energy_analysis.ipynb    # PPK2 energy profiling
+│   └── docs/
+│
+├── ML_Training/
+│   ├── data_preparation/
+│   │   ├── prepare_dataset.py       # Dataset split and export
+│   │   └── output/                  # train/test/held-out CSVs
+│   ├── model_training/
+│   │   └── train_model.py           # Model training and export
+│   ├── esp32_datasets/
+│   │   ├── mould_prediction_dataset.h  # Dataset header for ESP32
+│   │   ├── aifes_weights.h             # AIfES weight arrays
+│   │   └── tflm_model.h                # TFLM flatbuffer model
+│   ├── ppk2_results/                # PPK2 inference energy traces
+│   └── energy_analysis.ipynb        # Framework energy comparison
 │
 └── README.md
 ```
 
+## Hardware
+
+**ESP32 nodes (x3)**
+- ESP32 development board
+- DHT22 (temperature/humidity)
+- Adafruit SGP30 (TVOC/eCO2)
+- MQ3 (alcohol), with voltage divider
+- 5V supply; deep sleep between cycles (~10 µA)
+
+**Raspberry Pi hub**
+- Raspberry Pi 5
+- Camera Module 3 (12 MP, autofocus)
+- LED illumination on GPIO17
+- UART from ESP32 master on GPIO15
+
+**Energy measurement**
+- Nordic Power Profiler Kit 2 (PPK2)
+
+## ESP32 Wiring
+
+| ESP32 Master | Raspberry Pi |
+|---|---|
+| GPIO17 (TX2) | Pin 10 (GPIO15 / RX) |
+| GPIO16 (RX2) | Pin 8 (GPIO14 / TX) |
+| GND | Pin 6 / 9 / 14 |
+
 ## Quick Start
 
-### 1. ESP32 Setup
+**1. Flash firmware**
+Open the `ESP32/` folder in PlatformIO. Update the MAC addresses in `Node_Main.cpp` to match your hardware, then flash `Master_Node_Main.cpp` to the master node and `Node_Main.cpp` to both slaves.
+
+**2. Configure Raspberry Pi UART**
 ```bash
-# Open in PlatformIO
-# Upload Master_Node_Main.cpp to master ESP32
-# Upload Node_Main.cpp to slave nodes
-# Update MAC addresses in code to match your hardware
-```
-
-### 2. Wiring
-
-**ESP32 Master → Raspberry Pi:**
-| ESP32 Pin | → | Pi Pin | Function |
-|-----------|---|--------|----------|
-| GPIO17 (TX2) | → | Pin 10 (GPIO15) | Data |
-| GPIO16 (RX2) | → | Pin 8 (GPIO14) | (unused) |
-| GND | → | Pin 6/9/14 | Ground |
-
-### 3. Raspberry Pi Setup
-```bash
-# Configure UART (disable serial console)
-sudo nano /boot/cmdline.txt  # Remove console=serial0
-sudo nano /boot/config.txt   # Add: enable_uart=1
+# Disable serial console
+sudo nano /boot/cmdline.txt   # remove: console=serial0,115200
+sudo nano /boot/config.txt    # add: enable_uart=1
 sudo reboot
 
-# Install data collector
+# Run data collector
 cd ~/Thesis-Edge-AI/RaspberryPi/scripts
 python3 uart_data_collector.py
 ```
 
-See [RaspberryPi/docs/UART_SETUP_GUIDE.md](RaspberryPi/docs/UART_SETUP_GUIDE.md) for detailed instructions.
-
-## Downloading Data from Raspberry Pi
-
-Use the standardized batch download script to retrieve sensor data and images:
-
+**3. Download data to local machine**
 ```powershell
 cd RaspberryPi\scripts
 .\Download-BatchData.ps1 -BatchName "batch2"
 ```
 
-The script will:
-- ✅ Download sensor CSV data for the specified batch
-- ✅ Download all images for the batch  
-- ✅ Organize data in the correct RaspberryPiData folder structure
-- ✅ Verify download completeness
-
-**For detailed instructions and troubleshooting:**
-- 📖 [Full Download Guide](RaspberryPi/docs/guides/DOWNLOAD_BATCH_DATA.md)
-- 🚀 [Quick Reference](RaspberryPi/DOWNLOAD_QUICK_REFERENCE.md)
-- 📊 [Complete Workflow](RaspberryPi/BATCH_WORKFLOW.md)
-
-The script will create three subdirectories:
-- `sensor_data/` - CSV files with unified sensor readings
-- `images/` - JPG images from camera captures
-- `logs/` - System log files
-
-## Starting Batch Data Collection
-
-To start a new batch experiment (e.g., batch2, batch3):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Start-Batch2.ps1
-```
-
-This script will automatically:
-- Deploy the updated data collector to the Pi
-- Create batch-specific directories
-- Start data collection in the background
-
-Data will be saved to `~/thesis_data/sensor_data/batch2/` and `~/thesis_data/images/batch2/` on the Pi.
+Data is saved to `RaspberryPi/RaspberryPiData/batch2/` with subdirectories for `sensor_data/`, `images/`, and `logs/`.
 
 ## Data Format
 
-**Unified CSV:** `~/thesis_data/sensor_data/unified_sensor_data.csv`
+Sensor data is stored as a unified CSV where each row is a full system snapshot across all three nodes:
 
-```csv
-timestamp,cycle_number,master_temp,master_hum,master_tvoc,master_eco2,master_mq3_ppm,node1_temp,node1_hum,node1_tvoc,node1_eco2,node1_mq3_ppm,node2_temp,node2_hum,node2_tvoc,node2_eco2,node2_mq3_ppm
-2026-02-05 12:00:00,42,22.5,45.2,150,400,0.5,22.3,46.1,148,395,0.48,22.6,45.8,152,402,0.52
+```
+timestamp, cycle_number,
+master_temp, master_hum, master_tvoc, master_eco2, master_mq3_ppm,
+node1_temp, node1_hum, node1_tvoc, node1_eco2, node1_mq3_ppm,
+node2_temp, node2_hum, node2_tvoc, node2_eco2, node2_mq3_ppm
 ```
 
-Perfect for ML training - each row is a complete system snapshot.
+## ML Pipeline
+
+Training is done on the PC using `ML_Training/model_training/train_model.py`, which outputs weight arrays (`aifes_weights.h`) and a TFLM flatbuffer (`tflm_model.h`) ready to include directly in the ESP32 firmware. Energy profiling of each framework is done on-device with the PPK2, results saved to `ML_Training/ppk2_results/`.
+
+See [ML_Training/ML_Notes.md](ML_Training/ML_Notes.md) for framework comparison notes.
 
 ## Documentation
 
-- **[ESP32/README.md](ESP32/README.md)** - Firmware details & overnight testing
-- **[RaspberryPi/README.md](RaspberryPi/README.md)** - Pi setup & commands
-- **[RaspberryPi/docs/UART_SETUP_GUIDE.md](RaspberryPi/docs/UART_SETUP_GUIDE.md)** - Complete wiring guide
-- **[RaspberryPi/docs/SETUP_AND_DATA_GUIDE.md](RaspberryPi/docs/SETUP_AND_DATA_GUIDE.md)** - Data storage info
+- [RaspberryPi/README.md](RaspberryPi/README.md) — Pi setup and data collection commands
+- [RaspberryPi/docs/guides/SETUP_AND_DATA_GUIDE.md](RaspberryPi/docs/guides/SETUP_AND_DATA_GUIDE.md) — Full wiring and configuration guide
+- [RaspberryPi/docs/guides/DOWNLOAD_BATCH_DATA.md](RaspberryPi/docs/guides/DOWNLOAD_BATCH_DATA.md) — Data download reference
+- [RaspberryPi/BATCH_WORKFLOW.md](RaspberryPi/BATCH_WORKFLOW.md) — Batch experiment workflow
 
-## Hardware Requirements
+## Status
 
-### ESP32 Nodes (x3)
-- ESP32 Development Board
-- DHT22 Temperature/Humidity Sensor
-- Adafruit SGP30 TVOC/eCO2 Sensor
-- MQ3 Alcohol Sensor
-- Voltage divider circuit for MQ3
-- 5V power supply
-
-### Raspberry Pi
-- Raspberry Pi 3/4/5
-- Camera Module 3 (12MP)
-- microSD card (16GB+)
-- LED (GPIO17) for camera illumination
-
-## Current Status
-
-- ✅ ESP32 ESP-NOW mesh network
-- ✅ UART communication to Raspberry Pi
-- ✅ Unified CSV data format
-- ✅ Overnight stability testing complete
-- ✅ 15-minute cycle operation validated
-- 🔄 Edge AI model training (in progress)
-- 📝 Thesis writing (in progress)
-
-## Future Work
-
-- [ ] Edge AI inference on Raspberry Pi
-- [ ] Real-time anomaly detection
-- [ ] BLE Low Energy communication option
-- [ ] Solar power integration
-- [ ] Mobile app for monitoring
-
-## License
-
-Academic project - All rights reserved
-
-## Author
-
-Ciaran Mahon  
-MSc Smart Systems Engineering  
-Hanze University of Applied Sciences
+| Component | State |
+|---|---|
+| ESP-NOW mesh (3 nodes) | Done |
+| UART to Raspberry Pi | Done |
+| Data collection service | Done |
+| Camera integration | Done |
+| Overnight stability testing | Done |
+| ML training pipeline | Done |
+| AIfES / TFLM inference stubs | In progress |
+| Energy benchmarking (PPK2) | In progress |
+| Thesis write-up | In progress |
 
 ---
 
-**Branch:** `RaspPI` - Main development branch with UART implementation
+Ciaran Mahon — MSc Smart Systems Engineering — Hanze University of Applied Sciences
