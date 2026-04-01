@@ -161,4 +161,4 @@ See [ML_Training/ML_Notes.md](ML_Training/ML_Notes.md) for framework comparison 
 
 ---
 
-Ciaran Mahon — MSc Smart Systems Engineering — Hanze University of Applied Sciences
+Ciaran Maher — MSc Smart Systems Engineering — Hanze University of Applied Sciences
