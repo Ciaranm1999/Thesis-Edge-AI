@@ -104,6 +104,7 @@ python3 led_test.py
 ## 📚 Documentation
 
 For detailed setup and usage instructions, see:
+- **[docs/guides/DOWNLOAD_BATCH_DATA.md](docs/guides/DOWNLOAD_BATCH_DATA.md)** - Download data for analysis (⭐ START HERE for data retrieval)
 - **[docs/UART_SETUP_GUIDE.md](docs/UART_SETUP_GUIDE.md)** - UART wiring & configuration (PRIMARY)
 - **[docs/SETUP_AND_DATA_GUIDE.md](docs/SETUP_AND_DATA_GUIDE.md)** - Data storage format & locations
 - **[docs/QUICK_START.md](docs/QUICK_START.md)** - Fast setup guide
@@ -131,15 +132,44 @@ For detailed setup and usage instructions, see:
 
 ## 📁 Data Storage
 
+### On Raspberry Pi
 All data saved to `~/thesis_data/`:
 ```
 thesis_data/
 ├── sensor_data/
-│   └── unified_sensor_data.csv  # All 3 nodes in one file
+│   ├── Batch1/
+│   │   └── unified_sensor_data.csv
+│   ├── batch2/
+│   │   └── unified_sensor_data.csv
+│   └── batch3/
+│       └── unified_sensor_data.csv
 ├── images/
-│   ├── capture_20260205_120000.jpg
-│   └── ...
+│   ├── Batch1/
+│   │   ├── capture_20260220_220602.jpg
+│   │   └── ...
+│   ├── batch2/
+│   │   ├── capture_20260225_181409.jpg
+│   │   └── ...
+│   └── batch3/
+│       └── ...
 └── uart_data_collector.log
+```
+
+### On Local Machine (for Analysis)
+Data downloaded to `RaspberryPi/RaspberryPiData/`:
+```
+RaspberryPiData/
+├── images/
+│   ├── Batch1/
+│   ├── batch2/
+│   └── batch3/
+└── sensor_data/
+    ├── Batch1/
+    │   └── unified_sensor_data.csv
+    ├── batch2/
+    │   └── unified_sensor_data.csv
+    └── batch3/
+        └── unified_sensor_data.csv
 ```
 
 **Unified CSV Format:**
@@ -147,6 +177,32 @@ thesis_data/
 timestamp,cycle_number,master_temp,master_hum,master_tvoc,master_eco2,master_mq3_ppm,node1_temp,node1_hum,node1_tvoc,node1_eco2,node1_mq3_ppm,node2_temp,node2_hum,node2_tvoc,node2_eco2,node2_mq3_ppm
 2026-02-05 12:00:00,42,22.5,45.2,150,400,0.5,22.3,46.1,148,395,0.48,22.6,45.8,152,402,0.52
 ```
+
+## 📥 Downloading Batch Data for Analysis
+
+To download data from the Pi for analysis on your laptop:
+
+### Quick Method (Automated Script)
+```powershell
+# From Windows PowerShell
+cd RaspberryPi\scripts
+.\Download-BatchData.ps1 -BatchName "batch3"
+```
+
+The script will:
+- ✅ Connect to Pi via SSH
+- ✅ Download sensor CSV data
+- ✅ Download all batch images  
+- ✅ Organize data in correct folder structure
+- ✅ Show download summary
+
+### Manual Method
+See **[docs/guides/DOWNLOAD_BATCH_DATA.md](docs/guides/DOWNLOAD_BATCH_DATA.md)** for detailed manual download instructions.
+
+**After downloading:**
+1. Open `RaspberryPi/analysis/batch_analysis.ipynb` in Jupyter
+2. Update `SINGLE_BATCH = "batch3"` to your batch name
+3. Run all cells to generate analysis and plots
 
 ## 🎓 For Thesis
 

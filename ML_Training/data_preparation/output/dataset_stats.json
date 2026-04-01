@@ -1,0 +1,81 @@
+{
+  "feature_names": [
+    "node1_temp",
+    "node1_hum",
+    "node1_tvoc",
+    "node1_mq3_ppm",
+    "node2_temp",
+    "node2_hum",
+    "node2_tvoc",
+    "node2_mq3_ppm",
+    "delta_node1_tvoc",
+    "delta_node2_tvoc"
+  ],
+  "n_features": 10,
+  "n_train": 1278,
+  "n_test": 332,
+  "train_batches": [
+    "Batch1",
+    "batch2",
+    "batch3",
+    "batch4"
+  ],
+  "test_batches": [
+    "batch5"
+  ],
+  "normalisation": "min-max fitted on training set",
+  "feature_min": [
+    18.600000381469727,
+    47.900001525878906,
+    0.0,
+    3.078500270843506,
+    17.799999237060547,
+    67.69999694824219,
+    0.0,
+    1.6325223445892334,
+    -1604.0,
+    -3729.0
+  ],
+  "feature_max": [
+    36.900001525878906,
+    95.4000015258789,
+    52680.0,
+    317.1194152832031,
+    30.5,
+    95.30000305175781,
+    48811.0,
+    1953.28564453125,
+    5997.0,
+    3207.0
+  ],
+  "feature_range": [
+    18.30000114440918,
+    47.5,
+    52680.0,
+    314.0409240722656,
+    12.700000762939453,
+    27.600006103515625,
+    48811.0,
+    1951.653076171875,
+    7601.0,
+    6936.0
+  ],
+  "train_class_balance": {
+    "no_mould": 671,
+    "mould": 607
+  },
+  "test_class_balance": {
+    "no_mould": 222,
+    "mould": 110
+  },
+  "exclusions": {
+    "eco2": "Dropped - SGP30 eCO2 is TVOC-derived, unreliable in high-VOC environments",
+    "master_features": "Dropped - ambient air; Spearman |r| < 0.05 vs mould label",
+    "tvoc_saturation_threshold_ppb": 59000,
+    "mq3_null_rows": "43 rows dropped"
+  },
+  "engineered_features": {
+    "delta_node1_tvoc": "TVOC rate of change per cycle within batch; first row = 0",
+    "delta_node2_tvoc": "TVOC rate of change per cycle within batch; first row = 0"
+  }
+}

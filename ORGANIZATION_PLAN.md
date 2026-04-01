@@ -42,7 +42,7 @@ Thesis-Edge-AI/
 │   │
 │   ├── scripts/                       # Working scripts
 │   │   ├── uart_data_collector.py
-│   │   ├── Download-PiData.ps1
+│   │   ├── Download-BatchData.ps1      # Standardized batch data download
 │   │   └── Start-Batch2.ps1
 │   │
 │   └── analysis/                      # Jupyter notebooks

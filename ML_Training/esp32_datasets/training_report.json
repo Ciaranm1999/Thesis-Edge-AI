@@ -1,0 +1,18 @@
+{
+  "architecture": "Input(10) -> Dense(16, ReLU) -> Dense(1, Sigmoid)",
+  "epochs_trained": 21,
+  "test_loss": 0.6376845836639404,
+  "test_accuracy_0.5": 0.0,
+  "test_accuracy_best": 0.9397590361445783,
+  "best_threshold": 0.45000000000000007,
+  "precision": 0.96875,
+  "recall": 0.8454545454545455,
+  "f1_score": 0.9029126213592233,
+  "confusion_matrix": {
+    "TP": 93,
+    "TN": 219,
+    "FP": 3,
+    "FN": 17
+  },
+  "tflite_size_bytes": 2552
+}

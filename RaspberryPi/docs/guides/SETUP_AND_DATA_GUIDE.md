@@ -269,36 +269,45 @@ Or check:
 
 ## 💻 Getting Data to Your Laptop
 
-### Option 1: Manual Copy (Quick & Easy)
+### Option 1: Manual Copy (Advanced)
 
-From your Windows laptop:
+From your Windows laptop, for specific batch downloads:
 ```powershell
-# Copy all data to your Desktop
-scp -r edgeai@192.168.2.84:~/thesis_data "C:\Users\cmahe\Desktop\"
+# Set batch name
+$BATCH = "batch2"
 
-# Or just sensor data
-scp -r edgeai@192.168.2.84:~/thesis_data/sensor_data "C:\Users\cmahe\Desktop\"
+# Navigate to data directory
+cd "C:\Users\cmahe\OneDrive\Desktop\SSE Masters\Thesis\Code\Thesis-Edge-AI\RaspberryPi\RaspberryPiData"
 
-# Or just images
-scp -r edgeai@192.168.2.84:~/thesis_data/images "C:\Users\cmahe\Desktop\"
+# Copy batch sensor data
+cd "sensor_data\$BATCH"
+scp edgeai@172.20.10.3:~/thesis_data/sensor_data/$BATCH/unified_sensor_data.csv .
+
+# Copy batch images
+cd "..\..\images\$BATCH"
+scp "edgeai@172.20.10.3:~/thesis_data/images/$BATCH/*.jpg" .
 ```
 
-### Option 2: Auto-Sync Script (Recommended)
+**Note:** For most cases, use Option 2 (automated script) instead.
 
-Use the PowerShell sync script:
+### Option 2: Batch Download Script (Recommended)
+
+Use the standardized batch download script:
 ```powershell
 # From Windows - in your project folder
 cd "C:\Users\cmahe\OneDrive\Desktop\SSE Masters\Thesis\Code\Thesis-Edge-AI\RaspberryPi\scripts"
 
-# Run the sync script
-.\Sync-ThesisData.ps1
+# Download a specific batch
+.\Download-BatchData.ps1 -BatchName "batch2"
 ```
 
 This will:
-- Copy all CSV files to `C:\Users\cmahe\Desktop\thesis_data\sensor_data\`
-- Copy all images to `C:\Users\cmahe\Desktop\thesis_data\images\`
-- Copy logs
+- Copy batch CSV to `RaspberryPiData\sensor_data\batch2\`
+- Copy batch images to `RaspberryPiData\images\batch2\`
+- Verify download integrity
 - Show summary of downloaded files
+
+📖 **For detailed instructions:** See [DOWNLOAD_BATCH_DATA.md](DOWNLOAD_BATCH_DATA.md)
 
 ### Option 3: Web Dashboard (View in Browser)
 

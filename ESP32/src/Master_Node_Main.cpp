@@ -447,7 +447,7 @@ void setup() {
 
   // Energy optimizations
   btStop();                    // Disable Bluetooth - not used
-  setCpuFrequencyMhz(80);      // Reduce CPU from 240MHz to 80MHz
+  setCpuFrequencyMhz(160);     // Reduce CPU from 240MHz to 160MHz
 
   Serial.println("\n\n");
   Serial.println("###############################################################");

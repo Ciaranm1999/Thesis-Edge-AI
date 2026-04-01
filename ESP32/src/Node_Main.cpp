@@ -145,7 +145,7 @@ void setup() {
 
   // Energy optimizations
   btStop();                    // Disable Bluetooth - not used
-  setCpuFrequencyMhz(80);      // Reduce CPU from 240MHz to 80MHz
+  setCpuFrequencyMhz(160);     // Reduce CPU from 240MHz to 160MHz
 
   Serial.println("NODE WAKEUP");
 
@@ -173,18 +173,21 @@ void setup() {
   } else {
     // Restore SGP30 baseline from NVS
     prefs.begin(SGP_NAMESPACE, true);  // read-only
-    uint16_t eco2_base = prefs.getUShort(SGP_ECO2_KEY, 0);
-    uint16_t tvoc_base = prefs.getUShort(SGP_TVOC_KEY, 0);
+    bool hasEco2 = prefs.isKey(SGP_ECO2_KEY);
+    bool hasTvoc = prefs.isKey(SGP_TVOC_KEY);
+    uint16_t eco2_base = hasEco2 ? prefs.getUShort(SGP_ECO2_KEY, 0) : 0;
+    uint16_t tvoc_base = hasTvoc ? prefs.getUShort(SGP_TVOC_KEY, 0) : 0;
     prefs.end();
     
-    if (eco2_base != 0 && tvoc_base != 0) {
+    if (hasEco2 && hasTvoc && eco2_base != 0 && tvoc_base != 0
+        && eco2_base <= 60000 && tvoc_base <= 60000) {
       sgp.setIAQBaseline(eco2_base, tvoc_base);
       Serial.print("SGP30 baseline restored: eCO2=");
       Serial.print(eco2_base);
       Serial.print(", TVOC=");
       Serial.println(tvoc_base);
     } else {
-      Serial.println("No SGP30 baseline found in NVS");
+      Serial.println("No SGP30 baseline found in NVS - starting fresh");
     }
   }
 
@@ -215,16 +218,25 @@ void setup() {
   pkt.timestamp = millis();
 
   // Save SGP30 baseline to NVS for next cycle
+  // Guard: SGP30 returns ~65528 (0xFFF8) as its initial unlearned default.
+  // Only save once the sensor has converged to plausible values (<= 60000).
   uint16_t eco2_base, tvoc_base;
   if (sgp.getIAQBaseline(&eco2_base, &tvoc_base)) {
-    prefs.begin(SGP_NAMESPACE, false);  // read-write
-    prefs.putUShort(SGP_ECO2_KEY, eco2_base);
-    prefs.putUShort(SGP_TVOC_KEY, tvoc_base);
-    prefs.end();
-    Serial.print("SGP30 baseline saved: eCO2=");
-    Serial.print(eco2_base);
-    Serial.print(", TVOC=");
-    Serial.println(tvoc_base);
+    if (eco2_base <= 60000 && tvoc_base <= 60000) {
+      prefs.begin(SGP_NAMESPACE, false);  // read-write
+      prefs.putUShort(SGP_ECO2_KEY, eco2_base);
+      prefs.putUShort(SGP_TVOC_KEY, tvoc_base);
+      prefs.end();
+      Serial.print("SGP30 baseline saved: eCO2=");
+      Serial.print(eco2_base);
+      Serial.print(", TVOC=");
+      Serial.println(tvoc_base);
+    } else {
+      Serial.print("SGP30 baseline not saved (sensor still initialising): eCO2=");
+      Serial.print(eco2_base);
+      Serial.print(", TVOC=");
+      Serial.println(tvoc_base);
+    }
   }
 
   if (NODE_ENABLE_HUMAN_OUTPUT) {

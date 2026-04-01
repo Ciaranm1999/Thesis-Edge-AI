@@ -100,19 +100,23 @@ See [RaspberryPi/docs/UART_SETUP_GUIDE.md](RaspberryPi/docs/UART_SETUP_GUIDE.md)
 
 ## Downloading Data from Raspberry Pi
 
-Use the PowerShell script to download all sensor data, images, and logs from the Pi to your local machine:
+Use the standardized batch download script to retrieve sensor data and images:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Download-PiData.ps1
+cd RaspberryPi\scripts
+.\Download-BatchData.ps1 -BatchName "batch2"
 ```
 
-**⚠️ Important:** The download path in `Download-PiData.ps1` is configured for a specific external location. 
-Before running the script, you **must** update the `$LOCAL_DATA_DIR` variable to point to your desired download location.
+The script will:
+- ✅ Download sensor CSV data for the specified batch
+- ✅ Download all images for the batch  
+- ✅ Organize data in the correct RaspberryPiData folder structure
+- ✅ Verify download completeness
 
-Default path (change this):
-```powershell
-$LOCAL_DATA_DIR = "c:\Users\cmahe\OneDrive\Desktop\SSE Masters\Thesis\Data"
-```
+**For detailed instructions and troubleshooting:**
+- 📖 [Full Download Guide](RaspberryPi/docs/guides/DOWNLOAD_BATCH_DATA.md)
+- 🚀 [Quick Reference](RaspberryPi/DOWNLOAD_QUICK_REFERENCE.md)
+- 📊 [Complete Workflow](RaspberryPi/BATCH_WORKFLOW.md)
 
 The script will create three subdirectories:
 - `sensor_data/` - CSV files with unified sensor readings
@@ -193,8 +197,8 @@ Academic project - All rights reserved
 ## Author
 
 Ciaran Mahon  
-MSc Software Systems Engineering  
-University College Dublin
+MSc Smart Systems Engineering  
+Hanze University of Applied Sciences
 
 ---
 

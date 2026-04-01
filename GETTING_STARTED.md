@@ -54,9 +54,12 @@ ssh edgeai@172.20.10.3 'tail -f ~/thesis_data/uart_data_collector.log'
 
 ### 5. Download Data
 ```powershell
-# Download all data from Pi to laptop
-powershell -ExecutionPolicy Bypass -File .\RaspberryPi\scripts\Download-PiData.ps1
+# Download batch data from Pi to laptop
+cd RaspberryPi\scripts
+.\Download-BatchData.ps1 -BatchName "batch2"
 ```
+
+See [RaspberryPi/docs/guides/DOWNLOAD_BATCH_DATA.md](RaspberryPi/docs/guides/DOWNLOAD_BATCH_DATA.md) for detailed download instructions.
 
 ## First Time Setup
 
