@@ -20,6 +20,9 @@ import os
 import struct
 from pathlib import Path
 
+# Windows DLL path fix — required for TensorFlow 2.x on some Python 3.9 installs
+os.add_dll_directory("C:/Windows/System32")
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -34,8 +37,9 @@ DATA_DIR    = REPO_ROOT / "ML_Training" / "data_preparation" / "output"
 OUT_DIR     = REPO_ROOT / "ML_Training" / "esp32_datasets"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-TRAIN_CSV = DATA_DIR / "train.csv"
-TEST_CSV  = DATA_DIR / "test.csv"
+TRAIN_CSV    = DATA_DIR / "train.csv"
+TEST_CSV     = DATA_DIR / "test.csv"
+HELD_OUT_CSV = DATA_DIR / "held_out.csv"   # Batch 4 — TinyOL on-device training data
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -64,19 +68,29 @@ print("=" * 60)
 if not TRAIN_CSV.exists():
     raise FileNotFoundError(f"Run prepare_dataset.py first. Missing: {TRAIN_CSV}")
 
-train_df = pd.read_csv(TRAIN_CSV)
-test_df  = pd.read_csv(TEST_CSV)
+train_df    = pd.read_csv(TRAIN_CSV)
+test_df     = pd.read_csv(TEST_CSV)
+held_out_df = pd.read_csv(HELD_OUT_CSV)
+
+# For the TinyOL Option A split, the backbone is trained on Batches 1-3 only.
+# Batch 4 must NOT be seen during backbone training — it is reserved exclusively
+# for on-device TinyOL output layer fine-tuning.
+# Filter Batch 4 out of train_df entirely before any training.
+train_df = train_df[~train_df["batch"].isin(["batch4", "Batch4"])].copy()
 
 X_train = train_df[NORM_COLS].values.astype(np.float32)
 y_train = train_df["label"].values.astype(np.float32)
 X_test  = test_df[NORM_COLS].values.astype(np.float32)
 y_test  = test_df["label"].values.astype(np.float32)
+X_held  = held_out_df[NORM_COLS].values.astype(np.float32)
+y_held  = held_out_df["label"].values.astype(np.float32)
 
-print(f"\nLoaded:")
-print(f"  Train : {X_train.shape[0]} samples, {X_train.shape[1]} features")
-print(f"  Test  : {X_test.shape[0]} samples")
-print(f"  Train class balance: {int((y_train==0).sum())} no-mould / {int((y_train==1).sum())} mould")
-print(f"  Test  class balance: {int((y_test==0).sum())} no-mould  / {int((y_test==1).sum())} mould")
+print(f"\nLoaded (TinyOL Option A split):")
+print(f"  Backbone train (Batch1+2+3) : {X_train.shape[0]} samples")
+print(f"  TinyOL fine-tune (Batch4)   : {X_held.shape[0]} samples  [held_out.csv — ESP32 only]")
+print(f"  Evaluation (Batch5)         : {X_test.shape[0]} samples  [test.csv]")
+print(f"  Backbone train class balance: {int((y_train==0).sum())} no-mould / {int((y_train==1).sum())} mould")
+print(f"  Test class balance          : {int((y_test==0).sum())} no-mould  / {int((y_test==1).sum())} mould")
 
 # ---------------------------------------------------------------------------
 # 2. Build and train model
@@ -103,21 +117,16 @@ early_stop = keras.callbacks.EarlyStopping(
 )
 
 # ---------------------------------------------------------------------------
-# Batch-based validation split: use Batch 4 as validation set
+# Validation split: use Batch 3 as validation, Batches 1+2 as fit set.
 #
-# WHY NOT a row-percentage split:
-#   The data is ordered Batch1→Batch2→Batch3→Batch4 by time.
-#   Each batch ends with mould samples. Taking the last N% of rows
-#   always gives a val set that is ~100% mould, making val_loss/accuracy
-#   meaningless and causing early stopping to fire after ~16 epochs.
+# Batch 4 is fully reserved for TinyOL on-device fine-tuning and must NOT
+# appear anywhere in backbone training or validation.
 #
-# WHY Batch 4:
-#   It is the most recent training batch (closest in time to test Batch 5),
-#   it has both classes (94 no-mould + 193 mould), and it was collected
-#   AFTER batches 1-3, so using it for validation introduces no leakage.
-#   Batches 1-3 remain as the fit set (991 samples).
+# Batch 3 is the most recent backbone batch (closest in time to Batch 4),
+# making it the most informative validation set for early stopping.
+# Batches 1+2 (625 samples) remain as the gradient update set.
 # ---------------------------------------------------------------------------
-val_batches = ["batch4"]
+val_batches = ["batch3"]
 val_mask = train_df["batch"].isin(val_batches)
 
 X_tr  = train_df.loc[~val_mask, NORM_COLS].values.astype(np.float32)
@@ -129,10 +138,10 @@ n_neg = int((y_tr == 0).sum())
 n_pos = int((y_tr == 1).sum())
 class_weight = {0: 1.0, 1: n_neg / max(n_pos, 1)}
 
-print(f"\nBatch-based validation split:")
-print(f"  Fit (Batch1,2,3): {len(X_tr)} samples  "
+print(f"\nBackbone training split (Batch4 fully withheld for TinyOL):")
+print(f"  Fit (Batch1+2)  : {len(X_tr)} samples  "
       f"({int((y_tr==0).sum())} no-mould / {int((y_tr==1).sum())} mould)")
-print(f"  Val (Batch4)    : {len(X_val)} samples  "
+print(f"  Val (Batch3)    : {len(X_val)} samples  "
       f"({int((y_val==0).sum())} no-mould / {int((y_val==1).sum())} mould)")
 print(f"  Class weight mould (class 1): {class_weight[1]:.2f}x")
 
@@ -326,7 +335,67 @@ with open(tflm_path, "w") as f:
 print(f"  Saved: {tflm_path}")
 
 # ---------------------------------------------------------------------------
-# 6. Save training report
+# 6. Export held_out dataset header (Batch 4 — TinyOL on-device training)
+#
+# This header is loaded by tinyol_benchmark.cpp for on-device output layer
+# fine-tuning. It contains Batch 4 sensor readings — low-temperature cold
+# storage data that was never seen during backbone training (Batches 1-3).
+# The TinyOL benchmark trains its output layer on this data on-device,
+# then evaluates on test.csv (Batch 5) which it also has never seen.
+# ---------------------------------------------------------------------------
+print("\nExporting held_out dataset header (Batch 4 — TinyOL training data)...")
+
+held_n        = len(X_held)
+held_n_pos    = int((y_held == 1).sum())
+held_n_neg    = int((y_held == 0).sum())
+
+# Format X_held as C 2D array
+held_x_rows = []
+for row in X_held:
+    vals = ", ".join(f"{v:.8f}f" for v in row)
+    held_x_rows.append(f"  {{{vals}}}")
+held_x_str = ",\n".join(held_x_rows)
+
+# Format y_held as C array
+held_y_vals = ", ".join(str(int(v)) for v in y_held)
+
+held_lines = [
+    "/*",
+    " * held_out_dataset.h",
+    " * Auto-generated by train_model.py",
+    " *",
+    " * Batch 4 sensor data for TinyOL on-device output layer fine-tuning.",
+    " * This data was collected in a LOW TEMPERATURE cold storage environment.",
+    " * The backbone (Dense 10->16) was trained on Batches 1-3 (HIGH TEMPERATURE).",
+    " * The TinyOL output layer adapts to this new environment on-device.",
+    " *",
+    f" * Samples  : {held_n}  ({held_n_neg} no-mould / {held_n_pos} mould)",
+    f" * node1_temp_norm mean: {X_held[:, 0].mean():.4f}  (vs ~0.85 in Batches 1-3)",
+    " */",
+    "",
+    "#pragma once",
+    "",
+    f"#define N_HELD    {held_n}",
+    f"#define N_HELD_POS {held_n_pos}",
+    f"#define N_HELD_NEG {held_n_neg}",
+    "",
+    f"static const float held_X[{held_n}][{N_FEATURES}] = {{",
+    held_x_str,
+    "};",
+    "",
+    f"static const int held_y[{held_n}] = {{",
+    f"  {held_y_vals}",
+    "};",
+    "",
+]
+
+held_path = OUT_DIR / "held_out_dataset.h"
+with open(held_path, "w") as f:
+    f.write("\n".join(held_lines))
+print(f"  Saved: {held_path}  ({held_n} samples, {held_n_pos} mould / {held_n_neg} no-mould)")
+
+# ---------------------------------------------------------------------------
+# 7. Save training report
 # ---------------------------------------------------------------------------
 report = {
     "architecture": f"Input({N_FEATURES}) -> Dense({HIDDEN_SIZE}, ReLU) -> Dense({OUTPUT_SIZE}, Sigmoid)",
@@ -348,6 +417,7 @@ print(f"  Saved: {report_path}")
 
 print("\n" + "=" * 60)
 print("DONE - next steps:")
-print("  1. Flash ESP32/src/aifes_inference.cpp  -> measure with PPK2")
-print("  2. Flash ESP32/src/tflm_inference.cpp   -> measure with PPK2")
+print("  1. Flash ESP32/src/tinyol_benchmark.cpp -> measure with PPK2")
+print("     (trains output layer on held_out_dataset.h / Batch 4)")
+print("     (evaluates on mould_prediction_dataset.h / Batch 5)")
 print("=" * 60)
