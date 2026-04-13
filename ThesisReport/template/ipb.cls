@@ -108,12 +108,12 @@
 
 \begin{center}
 	\vspace{4em}
-    {\Huge\expandafter{\bf \@title}}
+    {\linespread{0.85}\Huge\bf\@title\par}
     \vfill
-    
+
     \vspace{2em}
-    by 
-    
+    by
+
     {\Large\textbf{
     \@author \ifdefined\@authnum \quad\@authnum \fi\\
 }}
@@ -134,23 +134,23 @@
     \vspace{1em}
     Master Smart Systems Engineering
     
-    \vspace{5.5em}
-    Confidential document
+    \vspace{3em}
+    Non-confidential document
 
     %Dissertation presented to the School of Technology and Management of Bragança to obtain the Master Degree in \@course.\\
-    
+
     % \vspace{4em}
     %  Supervisor:\\
     % \@supervisor\\
     % \ifdefined\@cosupervisor
     % \@cosupervisor\\
     % \fi
-    
+
 % 	\vspace*{\fill}
     % \vfill
-    
+
 %     This dissertation does not include the criticisms and suggestions made by the jury
-    \vspace{5.5em}
+    \vspace{3em}
 	Groningen\\
 	\@courseyear
 \end{center}
@@ -173,7 +173,7 @@
 \null\vskip1in%
 \begin{center}
 	\vspace{6em}
-    {\Huge\expandafter{\bf \@title}}
+    {\linespread{0.85}\Huge\bf\@title\par}
     \vfill
     {\Large\textbf{
     \@author \ifdefined\@authnum \quad\@authnum \fi\\

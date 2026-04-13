@@ -1,0 +1,124 @@
+\chapter{Introduction}\label{chap:rationale}
+
+\section{Problem Statement}
+
+Post-harvest food loss is a pressing challenge across Europe. In 2023, the European Union generated approximately 58 million tonnes of food waste, with fresh fruit and vegetables consistently among the most wasted categories \cite{Eurostat2023}. A substantial share of this loss occurs during transport and storage, where perishable produce such as strawberries is exposed to environmental conditions that promote mould growth. Strawberries are among the most widely cultivated soft fruit crops in Europe, with regional production reaching approximately 1.75 million tonnes annually \cite{FAOSTAT2024}. Despite this scale, strawberries are highly perishable and experience substantial post-harvest losses throughout the supply chain; studies estimate that between 25 and 50 per cent of fresh fruit and vegetables are lost globally before reaching the consumer, with temperature mismanagement during storage and distribution identified as a primary cause \cite{EC2019}. Grey mould caused by \textit{Botrytis cinerea} is widely regarded as the primary post-harvest disease of strawberries, and its development is strongly influenced by the temperature and atmospheric conditions encountered during cold chain distribution \cite{Petrasch2019, Nunes2012}.
+
+In commercial supply chains, produce passes through a sequence of environments --- refrigerated trucks, warehouse cold stores, and ambient agricultural storage --- each with its own temperature, humidity, and volatile organic compound profile. Time-temperature management across these transitions is a well-documented challenge, with studies showing that even brief excursions from recommended storage conditions can accelerate mould development and shorten the commercial shelf life of soft fruit \cite{Mercier2017}. Continuous, autonomous monitoring of these conditions offers a means to detect deteriorating environments before spoilage becomes irreversible, yet existing approaches do not adequately address the constraints of real deployments.
+
+Manual inspection is inherently intermittent and provides no continuous record of environmental conditions across distributed vehicle fleets and remote storage facilities. Fixed-threshold alarm systems offer a partial solution but cannot capture the multi-variable, environment-specific nature of mould risk, where the combined interaction of temperature, humidity, and volatile organic compounds determines spoilage probability in ways that single-parameter thresholds cannot represent \cite{Wang2024}. Machine learning models offer greater predictive capability, but architectures that depend on cloud connectivity assume network access that cannot be guaranteed for vehicles in transit or agricultural facilities in rural locations \cite{Lamberty2025}.
+
+Beyond connectivity, a more fundamental constraint limits centralised machine learning for this application. Temperature and humidity conditions vary substantially between deployment environments, and they shift over time with seasonal change, cargo type, and equipment behaviour --- a phenomenon known as concept drift, in which the statistical relationship between inputs and labels changes such that a previously trained model no longer reflects current conditions \cite{Bayram2022, Ilic2023}. Spatial microclimate variation within a single monitored environment can itself be considerable \cite{Ferentinos2017}, compounding the risk that a model trained on aggregated or centralised data will produce unreliable predictions at nodes it was never calibrated for.
+
+The system proposed in this thesis takes a different approach. Rather than relying on a pre-trained model or a remote service, each sensor node trains its own neural network using data collected from its own environment. This eliminates the dependency on connectivity, cloud infrastructure, and centralised training data, allowing the node to operate autonomously in any deployment location.
+
+An important clarification concerns what the system classifies. The network does not detect whether mould is visibly present on produce --- that could be observed by a human inspector. Instead, it classifies whether the current environmental conditions are consistent with early-stage mould development. This distinction matters for the system's practical value. In this study, training labels were assigned from the first moment any mould was visible in camera images, including growth at a very early and microscopic scale. Because mould produces volatile organic compounds (VOCs) during its early metabolic activity --- before significant decay is established or visible --- the sensor signals labelled as high risk correspond to the onset of mould conditions, not to terminal spoilage \cite{Yang2025, Ma2023}. When the deployed model classifies a sensor reading as high risk, it indicates that environmental conditions are consistent with those observed at the beginning of mould development. This provides an alert at a stage where intervention --- adjusting refrigeration, increasing ventilation, or inspecting cargo --- may still prevent loss.
+
+Three TinyML frameworks are evaluated in this thesis, representing different points on a spectrum of on-device adaptation capability \cite{Dutta2021, Ficco2024}. TensorFlow Lite for Microcontrollers (TF Lite Micro) \cite{David2021} deploys a frozen pre-trained model with no on-device learning. TinyOL \cite{Disabato2021} deploys a partially trainable model, adapting only the final layer to local conditions. AIfES (Artificial Intelligence for Embedded Systems) \cite{Wulfert2024} supports full neural network training directly on the microcontroller, requiring no pre-trained model. Each approach represents a different trade-off between adaptation capability and energy consumption. Quantifying that trade-off --- in energy per operation and estimated battery lifetime --- is the central contribution of this thesis.
+
+\section{Research Questions}
+
+The primary research question investigated in this thesis is:
+
+\begin{quote}
+\textit{What is the energy cost of full on-device neural network training compared to partial adaptation and inference-only execution on an ESP32 microcontroller, and when is that cost operationally justified for autonomous, disconnected edge deployments?}
+\end{quote}
+
+Four sub-questions provide the measurements and analysis needed to answer the primary question:
+
+\begin{table}[H]
+\centering
+\caption{Research sub-questions and their expected outputs}
+\label{tab:subquestions}
+\begin{tabulary}{\textwidth}{|c|L|L|}
+\hline
+\textbf{\#} & \textbf{Sub-question} & \textbf{Output} \\
+\hline
+SQ1 & What is the baseline energy consumption of the mould detection system (ESP32 with DHT22, SGP30, and MQ3 sensors) during normal sensing operation, without any machine learning execution? & Baseline power budget: combined sensor and idle MCU consumption \\
+\hline
+SQ2 & How does the energy consumption of AIfES, TinyOL, and TF Lite Micro compare across training and inference phases on an ESP32? & Energy per training cycle and per inference cycle, per framework; RAM and Flash usage per framework \\
+\hline
+SQ3 & How does mould risk prediction accuracy compare across the three frameworks under representative environmental conditions? & Accuracy, precision, and recall per framework \\
+\hline
+SQ4 & What is the estimated battery lifetime of an autonomous mould detection node under each framework, given the measured energy profiles and a realistic deployment duty cycle? & Estimated operational runtime per battery capacity per framework, for current and improved hardware configurations \\
+\hline
+\end{tabulary}
+\end{table}
+
+\section{Project Goal}
+
+The goal of this project is to design and evaluate a low-cost mould risk monitoring system using an ESP32 microcontroller and environmental sensors, and to determine which TinyML framework --- AIfES, TinyOL, or TF Lite Micro --- best balances energy consumption, prediction performance, and operational autonomy for deployment in disconnected environments where cloud connectivity and manual maintenance are not available.
+
+\section{Scope}
+
+The scope of this thesis is defined along four dimensions: hardware platform, software frameworks, application domain, and measurement methodology.
+
+\textbf{Hardware platform.} All experiments are conducted on the ESP32 microcontroller. Energy measurements, memory characterisation, and framework comparisons are specific to this device and are not generalised to other microcontroller architectures. The sensor node prototype integrates a DHT22 (temperature and humidity), an SGP30 (total VOC), and an MQ3 (ethanol vapour) on a custom PCB.
+
+\textbf{Frameworks.} The three TinyML frameworks evaluated are AIfES, TinyOL, and TF Lite Micro. These were selected to represent the full spectrum from inference-only execution to full on-device training. No other frameworks are assessed within this work.
+
+\textbf{Application domain.} The experimental evaluation uses strawberry grey mould as the application domain under controlled laboratory conditions. Mould growth was deliberately induced to generate labelled sensor data under known environmental conditions. A Raspberry Pi 5 camera module was used exclusively as a ground-truth labelling instrument, capturing hourly images from which binary mould risk labels were assigned to the corresponding sensor readings. The camera is not a component of the deployed sensor node and would not be present in an operational deployment. Validation beyond the laboratory --- in real cold chain environments or with other produce types --- is outside the scope of this work.
+
+\textbf{Measurement methodology.} Energy consumption was measured using a Nordic Semiconductor PPK2 power analyser, which acted as both the regulated supply and the precision measurement instrument throughout all experiments. Battery lifetime (SQ4) is estimated analytically from these measured figures; live battery discharge testing was not conducted. The MQ3 sensor is included in all primary energy measurements and is identified as a significant power constraint for battery-powered operation. An improved hardware configuration in which the MQ3 is replaced by a lower-power MEMS gas sensor is modelled analytically in the SQ4 analysis alongside the measured prototype results. The thesis does not address wireless communication protocols, over-the-air model updates, cloud integration, or multi-node network behaviour.
+
+\section{Requirements}
+
+The mould risk monitoring node is specified by the following functional and non-functional requirements.
+
+\subsection{Functional Requirements}
+
+\begin{table}[H]
+\centering
+\caption{Functional requirements}
+\label{tab:fr}
+\begin{tabulary}{\textwidth}{|c|L|}
+\hline
+\textbf{ID} & \textbf{Requirement} \\
+\hline
+FR1 & The system shall measure temperature using a DHT22 sensor \\
+\hline
+FR2 & The system shall measure relative humidity using a DHT22 sensor \\
+\hline
+FR3 & The system shall measure total VOC levels using an SGP30 sensor \\
+\hline
+FR4 & The system shall measure ethanol vapour levels using an MQ3 sensor \\
+\hline
+FR5 & The system shall classify mould risk from sensor readings using a neural network \\
+\hline
+FR6 & The system shall operate without cloud connectivity or internet access \\
+\hline
+FR7 & The system shall support three TinyML frameworks: AIfES (full on-device training), TinyOL (partial adaptation), and TF Lite Micro (inference only) \\
+\hline
+FR8 & The system shall record energy consumption data measurable by a precision power analyser \\
+\hline
+\end{tabulary}
+\end{table}
+
+\subsection{Non-Functional Requirements}
+
+\begin{table}[H]
+\centering
+\caption{Non-functional requirements}
+\label{tab:nfr}
+\begin{tabulary}{\textwidth}{|c|L|}
+\hline
+\textbf{ID} & \textbf{Requirement} \\
+\hline
+NFR1 & The system shall run on an ESP32 microcontroller \\
+\hline
+NFR2 & All frameworks shall fit within ESP32 memory constraints (\SI{520}{\kilo\byte} SRAM, \SI{4}{\mega\byte} Flash) \\
+\hline
+NFR3 & Sensor sampling shall occur at 15-minute intervals \\
+\hline
+NFR4 & AIfES shall retrain once every 24 hours using the preceding 96 samples \\
+\hline
+NFR5 & Battery lifetime shall be analytically estimated from measured energy profiles \\
+\hline
+NFR6 & The system shall use a custom PCB integrating the ESP32 and all sensors \\
+\hline
+\end{tabulary}
+\end{table}
+
+\section{Report Structure}
+
+The remainder of this report is structured as follows. Chapter~2 provides a literature review covering post-harvest mould monitoring, environmental microclimate variability, concept drift in IoT systems, TinyML frameworks, and energy profiling methods for embedded systems. Chapter~3 presents the conceptual model, including the sensor node architecture and the machine learning pipeline. Chapter~4 describes the research design and experimental methodology. Chapter~5 presents and analyses the results for each sub-question. Chapter~6 provides conclusions and recommendations, including hardware improvement proposals derived from the energy analysis.

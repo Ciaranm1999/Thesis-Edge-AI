@@ -1,5 +1,31 @@
 \chapter{Conceptual Model}\label{chap:conceptual_model}
 
-In this chapter you must explain, using the information from the previous two chapters and critical thinking, the most likely solution to your problem definition (narrowing down the theories and research), resulting in a final theory and/or model. Under a conceptual model it is understood that:  the author first investigates which factors play a role, and then provides argumentation for the identification of the most important ones. This chapter is basically a summary of chapter 2 and should be roughly 1 page long.
+The literature reviewed in the previous chapter identifies a set of factors that together define the design space for the proposed system. This chapter narrows that space to the specific model adopted in this thesis, providing the reasoning that connects each design decision to the evidence base.
 
+\section{Key Factors and Their Relative Importance}
 
+Five factors emerge from the literature as determinants of the system design.
+
+\textbf{Multi-variable mould risk.} Grey mould development is not governed by any single environmental parameter. Temperature, relative humidity, and the VOC profile of a storage environment interact to determine spoilage risk. Fixed-threshold monitoring of a single variable cannot represent this relationship, which necessitates a multi-input classifier rather than a rule-based alarm.
+
+\textbf{Early VOC signal.} Fungi produce characteristic volatile compounds during early metabolic activity, before visible decay is established \cite{Yang2025, Ma2023}. For \textit{Botrytis cinerea}, specific biomarkers --- including 1-octen-3-ol, 2-methyl-1-butanol, 2-methyl-1-propanol, and short-chain ketones --- are detectable in the storage atmosphere of infected strawberry \cite{Vandendriessche2012}. Measuring these signals alongside temperature and humidity allows the classifier to operate as an early-warning indicator rather than a confirmation of loss already underway.
+
+\textbf{Sensor placement below produce level.} The VOC compounds of interest have molecular weights substantially higher than air, causing them to stratify in low-airflow enclosed environments and accumulate near the base of the space \cite{Zhang2026}. A sensor mounted at produce height will underestimate the VOC concentration building up below it. Correct placement --- below the stored produce --- is therefore a prerequisite for reliable signal capture, independent of the classifier design.
+
+\textbf{Connectivity independence.} Cold chain deployments include vehicles in transit and rural facilities where network access cannot be assumed. A system that depends on cloud infrastructure for inference or training cannot meet the availability requirement. All processing must execute locally on the sensor node.
+
+\textbf{Concept drift and local adaptation.} Temperature and humidity conditions differ between deployment sites and shift over time. A model trained on data from one environment is not guaranteed to transfer reliably to another. Local adaptation --- updating the model from data collected at the current site --- is the mechanism for maintaining prediction reliability without requiring network connectivity or manual reconfiguration.
+
+\section{The Proposed System Model}
+
+The factors above produce the following system model, illustrated in Figure~\ref{fig:conceptual_model}.
+
+The sensor node consists of an ESP32 microcontroller connected to a DHT22 (temperature and humidity), an SGP30 (total VOC index), and an MQ3 (ethanol vapour). The node operates on a fixed duty cycle: it wakes at 15-minute intervals, takes one reading from each sensor, runs the trained classifier, and returns to deep sleep. This duty cycle keeps the baseline energy consumption low while providing sufficient temporal resolution to track environmental changes relevant to mould onset.
+
+The classifier is a small feed-forward neural network with a binary output: conditions consistent with early-stage mould development, or conditions not consistent with it. Three variants of this classifier are evaluated, each corresponding to a different TinyML framework: TF Lite Micro, which runs a frozen pre-trained model; TinyOL, which adapts the final layer to local conditions from new observations; and AIfES, which supports complete on-device training without any pre-trained weights. The three variants represent a spectrum of local adaptation capability, and their comparison in energy terms is the central measurement objective of this thesis.
+
+Training labels were assigned from camera images taken at hourly intervals during the data collection phase, with the positive class corresponding to any session in which mould was visible in the image --- including early microscopic growth. This labelling strategy aligns the training signal with the onset of mould conditions rather than terminal spoilage, consistent with the early-detection rationale established above.
+
+\section{Summary}
+
+The conceptual model is an autonomous, battery-powered sensor node that classifies mould risk from continuous environmental measurements without any dependency on cloud connectivity or manual recalibration. The choice of sensor types follows from the identified VOC biomarkers; the sensor placement follows from the stratification behaviour of those compounds; the multi-input classifier follows from the multi-variable nature of mould risk; and the spectrum of TinyML frameworks follows from the requirement to operate and adapt locally under concept drift. The energy cost of each point on that spectrum is the question the experimental work addresses.
