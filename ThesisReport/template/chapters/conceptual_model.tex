@@ -4,27 +4,51 @@ The literature reviewed in the previous chapter identifies a set of factors that
 
 \section{Key Factors and Their Relative Importance}
 
-Five factors emerge from the literature as determinants of the system design.
+Five factors emerge from the literature as determinants of the system design, though they do not carry equal weight.
 
-\textbf{Multi-variable mould risk.} Grey mould development is not governed by any single environmental parameter. Temperature, relative humidity, and the VOC profile of a storage environment interact to determine spoilage risk. Fixed-threshold monitoring of a single variable cannot represent this relationship, which necessitates a multi-input classifier rather than a rule-based alarm.
+The first two factors establish why machine learning is necessary at all. \textbf{Multi-variable mould risk} means that no single threshold on any single sensor can reliably represent spoilage hazard --- temperature, humidity, and VOC concentration interact, and only a multi-input classifier can model that relationship. \textbf{Early VOC signal} means that the sensor types required must include gas sensing alongside temperature and humidity: the volatile compounds produced during early \textit{Botrytis cinerea} activity provide a leading indicator of mould onset before any visible decay is established \cite{Yang2025, Ma2023}. For \textit{B. cinerea} specifically, detectable biomarkers in the storage atmosphere of infected strawberry include 1-octen-3-ol, 2-methyl-1-butanol, 2-methyl-1-propanol, and short-chain ketones \cite{Vandendriessche2012}. These two factors together fix the sensor selection --- DHT22 for temperature and humidity, SGP30 for total VOC, MQ3 for ethanol vapour --- and justify the choice of a neural network classifier over a rule-based approach. Beyond the instantaneous sensor readings, the rate of change of VOC concentration ($\Delta$TVOC) was also included as a feature: a rising VOC level is more indicative of active and accelerating fungal metabolism than a static reading alone, and including the delta allows the classifier to distinguish between a stable elevated-VOC environment and one in which concentrations are actively increasing.
 
-\textbf{Early VOC signal.} Fungi produce characteristic volatile compounds during early metabolic activity, before visible decay is established \cite{Yang2025, Ma2023}. For \textit{Botrytis cinerea}, specific biomarkers --- including 1-octen-3-ol, 2-methyl-1-butanol, 2-methyl-1-propanol, and short-chain ketones --- are detectable in the storage atmosphere of infected strawberry \cite{Vandendriessche2012}. Measuring these signals alongside temperature and humidity allows the classifier to operate as an early-warning indicator rather than a confirmation of loss already underway.
+The third factor, \textbf{sensor placement below produce level}, is a physical constraint that follows from the stratification behaviour of the target VOC compounds in low-airflow enclosed environments \cite{Zhang2026}. It does not alter the classifier design but is a necessary condition for valid signal capture, and it informs the mechanical design of the sensor node described in the following chapter.
 
-\textbf{Sensor placement below produce level.} The VOC compounds of interest have molecular weights substantially higher than air, causing them to stratify in low-airflow enclosed environments and accumulate near the base of the space \cite{Zhang2026}. A sensor mounted at produce height will underestimate the VOC concentration building up below it. Correct placement --- below the stored produce --- is therefore a prerequisite for reliable signal capture, independent of the classifier design.
+The final two factors carry the most weight in shaping the research questions. \textbf{Connectivity independence} eliminates cloud-based inference as an option for vehicles in transit and rural storage facilities where network access cannot be assumed, satisfying functional requirement FR6. \textbf{Concept drift} eliminates a centrally pre-trained static model as a reliable long-term solution, since the statistical relationship between sensor readings and mould risk shifts between deployment environments and changes over time \cite{Bayram2022, Ilic2023}. Together, these two factors force the question the thesis addresses: if the model must run and adapt locally on a battery-powered node, what does that cost in energy, and at what point on the adaptation spectrum is that cost operationally justified?
 
-\textbf{Connectivity independence.} Cold chain deployments include vehicles in transit and rural facilities where network access cannot be assumed. A system that depends on cloud infrastructure for inference or training cannot meet the availability requirement. All processing must execute locally on the sensor node.
+\section{Mapping the Model to Research Questions and Requirements}
 
-\textbf{Concept drift and local adaptation.} Temperature and humidity conditions differ between deployment sites and shift over time. A model trained on data from one environment is not guaranteed to transfer reliably to another. Local adaptation --- updating the model from data collected at the current site --- is the mechanism for maintaining prediction reliability without requiring network connectivity or manual reconfiguration.
+The proposed system is a battery-powered sensor node --- an ESP32 microcontroller with DHT22, SGP30, and MQ3 sensors, running a neural network classifier entirely on-device without cloud connectivity. This single architecture is evaluated under three configurations corresponding to the three TinyML frameworks: TF Lite Micro (inference only, no on-device adaptation), TinyOL (partial adaptation of the final output layer), and AIfES (full on-device training with no pre-trained weights). The progression from inference-only to full training maps directly onto the progression from connectivity dependence to full autonomy identified in the literature. Figure~\ref{fig:conceptual_model} illustrates this architecture.
 
-\section{The Proposed System Model}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    sensor/.style={draw, rectangle, rounded corners=3pt, minimum width=2.6cm, minimum height=0.8cm, fill=gray!12, font=\small, align=center},
+    nnbox/.style={draw, rectangle, rounded corners=3pt, minimum width=3.4cm, minimum height=2.2cm, fill=blue!12, font=\scriptsize, align=center},
+    outbox/.style={draw, rectangle, rounded corners=3pt, minimum width=2.6cm, minimum height=1.2cm, fill=green!12, font=\small, align=center},
+    arrow/.style={-Stealth, semithick}
+]
+% Sensor nodes (left column)
+\node[sensor] (dht) at (0,  1.6) {DHT22\\\scriptsize Temp / Humidity};
+\node[sensor] (sgp) at (0,  0)   {SGP30\\\scriptsize Total VOC};
+\node[sensor] (mq3) at (0, -1.6) {MQ3\\\scriptsize Ethanol};
+% ESP32 bounding box
+\draw[draw=black!50, fill=blue!4, rounded corners=5pt] (2.7,-2.3) rectangle (6.3, 2.3);
+\node[font=\footnotesize\bfseries] at (4.5, 2.0) {ESP32};
+% NN classifier inside ESP32
+\node[nnbox] (nn) at (4.5, -0.1) {Neural Network\\Classifier\\[5pt]\scriptsize TF Lite Micro (frozen)\\TinyOL (last layer)\\AIfES (full training)};
+% Output node (right)
+\node[outbox] (out) at (8.6, 0) {Mould Risk\\[3pt]\scriptsize Low~/~High};
+% Sensor to ESP32 arrows
+\draw[arrow] (dht.east) -- ++(0.5,0) |- (2.7,  1.1);
+\draw[arrow] (sgp.east) -- (2.7, 0);
+\draw[arrow] (mq3.east) -- ++(0.5,0) |- (2.7, -1.1);
+% ESP32 to output arrow
+\draw[arrow] (6.3, 0) -- (out.west);
+\end{tikzpicture}
+\caption{Architecture of the autonomous mould detection node. Sensor readings are passed to the ESP32, which runs one of three TinyML classifier configurations depending on the experimental condition. No external connectivity is required at any stage.}
+\label{fig:conceptual_model}
+\end{figure}
 
-The factors above produce the following system model, illustrated in Figure~\ref{fig:conceptual_model}.
+This architecture is designed to answer the primary research question --- what is the energy cost of full on-device training compared to partial adaptation and inference-only execution, and when is that cost operationally justified --- by providing three directly comparable implementations on identical hardware. The four sub-questions each address a distinct layer of that answer. The first isolates the energy cost of the sensing hardware alone, so that the overhead added by machine learning can be attributed specifically to the framework rather than to the underlying sensors. The second characterises the energy consumed per training cycle and per inference cycle across all three framework variants, producing the per-operation figures needed for comparison. The third verifies that the three variants achieve comparable prediction performance, since an energy comparison between frameworks of substantially different accuracy would not be meaningful. The fourth combines the measured energy figures with a realistic deployment duty cycle to project how long a battery-powered node could operate under each framework --- translating the per-operation measurements into an operational judgement.
 
-The sensor node consists of an ESP32 microcontroller connected to a DHT22 (temperature and humidity), an SGP30 (total VOC index), and an MQ3 (ethanol vapour). The node operates on a fixed duty cycle: it wakes at 15-minute intervals, takes one reading from each sensor, runs the trained classifier, and returns to deep sleep. This duty cycle keeps the baseline energy consumption low while providing sufficient temporal resolution to track environmental changes relevant to mould onset.
-
-The classifier is a small feed-forward neural network with a binary output: conditions consistent with early-stage mould development, or conditions not consistent with it. Three variants of this classifier are evaluated, each corresponding to a different TinyML framework: TF Lite Micro, which runs a frozen pre-trained model; TinyOL, which adapts the final layer to local conditions from new observations; and AIfES, which supports complete on-device training without any pre-trained weights. The three variants represent a spectrum of local adaptation capability, and their comparison in energy terms is the central measurement objective of this thesis.
-
-Training labels were assigned from camera images taken at hourly intervals during the data collection phase, with the positive class corresponding to any session in which mould was visible in the image --- including early microscopic growth. This labelling strategy aligns the training signal with the onset of mould conditions rather than terminal spoilage, consistent with the early-detection rationale established above.
+The cloud-free, fully autonomous operating requirement is not an incidental constraint --- it is the condition that makes the energy question meaningful in the first place. An architecture with reliable network access could offload training to a remote server entirely, and the on-device energy cost would be irrelevant. It is precisely the removal of that option, motivated by the connectivity and concept-drift factors identified above, that creates the need to understand what on-device training costs and whether a battery-powered node can sustain it over a realistic operational period.
 
 \section{Summary}
 

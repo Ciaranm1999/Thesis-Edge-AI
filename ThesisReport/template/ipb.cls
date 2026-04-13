@@ -107,9 +107,8 @@
 \end{center}
 
 \begin{center}
-	\vspace{4em}
+    \vspace{2em}
     {\linespread{0.85}\Huge\bf\@title\par}
-    \vfill
 
     \vspace{2em}
     by
@@ -117,42 +116,29 @@
     {\Large\textbf{
     \@author \ifdefined\@authnum \quad\@authnum \fi\\
 }}
-      \vfill
-    \vspace{4em}
+    \vspace{2em}
+
     GRADUATION REPORT
-    \vfill
-    \vspace{4em}
+
+    \vspace{2em}
     \normalsize
     Submitted to
 
     Hanze University of Applied Sciences
-    \vfill
+
     \vspace{1em}
     in partial fulfillment of the requirements \\
     for the degree of
-    \vfill
+
     \vspace{1em}
     Master Smart Systems Engineering
-    
-    \vspace{3em}
+
+    \vspace{2em}
     Non-confidential document
 
-    %Dissertation presented to the School of Technology and Management of Bragança to obtain the Master Degree in \@course.\\
-
-    % \vspace{4em}
-    %  Supervisor:\\
-    % \@supervisor\\
-    % \ifdefined\@cosupervisor
-    % \@cosupervisor\\
-    % \fi
-
-% 	\vspace*{\fill}
-    % \vfill
-
-%     This dissertation does not include the criticisms and suggestions made by the jury
-    \vspace{3em}
-	Groningen\\
-	\@courseyear
+    \vspace{2em}
+    Groningen\\
+    \@courseyear
 \end{center}
 % \cleardoublepage
 }

@@ -1,64 +1,265 @@
-\chapter{Research design}\label{chap:research}
+\chapter{Research Design}\label{chap:research}
 
-The Research Design chapter contains everything that you have done in order to answer your research question. Write and state things in such a way that somebody can repeat your research and arrive at the exact same results. You can use the chapter in your master thesis definition as a start, but generally, research designs end up differently from what you intended to do in the first place. A special remark: it should be written in the PAST TENSE, since you now have already done it.
+This chapter describes the experimental methodology used to answer the research questions. The procedure followed four stages: hardware construction and sensor node assembly, data collection inside a custom-built environmental test chamber, implementation of each TinyML framework, and energy measurement across all operational phases. Figure~\ref{fig:experimental_procedure} summarises the overall sequence.
 
-
-Note, the following content are some examples of techniques that one can use. Read the comments for explanations.
-
-
-\section{Methodology}
-
-A list of requirements has been defined to guide the project, a general and detailed design were developed and implemented to support the investigation of the research question.
-
-\subsection{Requirements}
-
-% One can replace \begin{enumerate} and \end{enumerate} with \begin{itemize} and \end{itemize} respectively for bullets instead of numbers.
-\vspace{2mm}
-\begin{enumerate}
-  \item The Cobot safety features are enabled at all times.
-  \item The system architecture is ROS based.
-  \item The system works in simulation and real environment.
-  \item The training is done using RL techniques.
-  \item The algorithm is trained using self experience and memory replay.
-  \item The algorithm uses RGBD images to estimate the actions.
-\end{enumerate}
-\vspace{3mm} 
-
-\section{General Design}
-
-General design text. See \fref{tab:models}.  % Note how \fref{} allows to refer to a label.
-
-\section{Detailed Design}
-
-Detailed design text. You don't have to follow this structure. Feel free to include, remove or change the titles of the sections.
-
-An example of a table is shown in \fref{tab:models}. Moreover, an example of a figure is shown in \fref{fig:example_figure}. Always use the proper reference to cite tables and figures. Do not mention "table below" or "figure above", for example.
-
-\begin{table}
-    \centering
-        \begin{tabular}{ p{35mm}  P{3cm}   P{40mm}  P{3cm}}
-            \hline
-            Model name & Feature space & Est. total size (MB) & Top-5 error \\
-            \hline
-            AlexNet          &   256  x 6 x  6     &  242.03  &    20.91 \\
-            SqueezeNet       &   512  x 13 x 13   &   76.54   &    19.58 \\
-            Densenet         &   1024 x 7 x  7    &   325.21  &    7.83  \\
-            GoogleNet        &   1024 x 7 x  7    &   85.91   &    10.47 \\
-            MobileNet        &   1280 x 7 x  7    &   162.45  &    9.71  \\
-            ResNeXt-50-32x4d &   2048 x 7 x  7    &   415.72  &    6.30  \\
-            MNASNet          &   1280 x 7 x  7    &   135.77  &    8.4  \\
-            \hline
-        \end{tabular}
-    \caption{This is the caption of the example table.}
-    \label{tab:models}
-\end{table}
-
-
-\begin{figure}[b]  % b for bottom of page
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/hanzelogo_nl.png}
-    \caption{This is the caption of the example figure.}
-    \label{fig:example_figure}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    process/.style={draw, rectangle, rounded corners=4pt, minimum width=9cm, minimum height=0.85cm,
+                    fill=blue!7, font=\small, align=center, text width=8.5cm},
+    highlight/.style={draw, rectangle, rounded corners=4pt, minimum width=9cm, minimum height=0.85cm,
+                      fill=orange!12, font=\small, align=center, text width=8.5cm},
+    arrow/.style={-Stealth, semithick},
+    node distance=0.45cm
+]
+\node[process]   (p1) {Construct environmental test chamber and calibrate sensor nodes};
+\node[process,   below=of p1] (p2) {Place sensor nodes at designated positions; mount Raspberry Pi 5 camera above produce};
+\node[process,   below=of p2] (p3) {Collect sensor readings at 15-minute intervals and camera images at 1-hour intervals};
+\node[process,   below=of p3] (p4) {Assign binary mould risk labels from camera images (0: no mould, 1: mould visible)};
+\node[process,   below=of p4] (p5) {Partition dataset into training and evaluation batches};
+\node[highlight, below=of p5] (p6) {Implement on ESP32: \quad TF Lite Micro (inference only) \quad TinyOL (partial adaptation) \quad AIfES (full on-device training)};
+\node[process,   below=of p6] (p7) {Measure energy per operational phase using the PPK2 power analyser};
+\node[process,   below=of p7] (p8) {Compare prediction accuracy across frameworks and estimate battery lifetime per configuration};
+\draw[arrow] (p1)--(p2); \draw[arrow] (p2)--(p3); \draw[arrow] (p3)--(p4);
+\draw[arrow] (p4)--(p5); \draw[arrow] (p5)--(p6); \draw[arrow] (p6)--(p7);
+\draw[arrow] (p7)--(p8);
+\end{tikzpicture}
+\caption{Overview of the experimental procedure. The highlighted step covers all three TinyML framework variants, each evaluated on the same hardware and dataset.}
+\label{fig:experimental_procedure}
 \end{figure}
 
+\section{Hardware Implementation}
 
+\subsection{Sensor Nodes and Custom PCB}
+
+Three sensor nodes were built, each on a custom printed circuit board integrating an ESP32 microcontroller with a DHT22 (temperature and relative humidity), an SGP30 (total VOC index and equivalent CO\textsubscript{2}), and an MQ3 (ethanol vapour). Firmware was developed and flashed using PlatformIO. Two nodes operated as sensing nodes, transmitting readings wirelessly to a third node designated as the master. The master collected its own sensor readings, received packets from both sensing nodes over the ESP-NOW protocol, and forwarded all data to a Raspberry Pi 5 over UART at 115200\,baud in JSON format. The master was the only node with a wired connection; the two sensing nodes communicated exclusively via ESP-NOW, with no infrastructure Wi-Fi required. Figure~\ref{fig:pcb} shows the assembled sensor node.
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][7cm][c]{0.72\textwidth}{\centering\small\textit{[Insert photo of assembled sensor node PCB here]}}}
+    \caption{Custom PCB integrating the ESP32 microcontroller with DHT22, SGP30, and MQ3 sensors. Three identical boards were produced.}
+    \label{fig:pcb}
+\end{figure}
+
+To reduce idle power consumption, all nodes disabled Bluetooth at startup and reduced the CPU clock from 240\,MHz to 160\,MHz, as the lower frequency is sufficient for all sensing and ML operations while reducing dynamic power draw.
+
+\subsection{Sensor Configuration}
+
+The DHT22 was polled once per wake cycle using its standard single-wire protocol. The SGP30 communicates over I\textsuperscript{2}C and requires its metal oxide sensing element to be driven through a 45-second warm-up sequence before each measurement; this was implemented by calling the IAQ measurement function once per second for 45 seconds before recording the TVOC reading. The SGP30 also maintains an internal baseline calibration that improves over time; this baseline was written to ESP32 non-volatile storage (NVS) at the end of each wake cycle and restored on the following wake, preserving continuity across deep sleep intervals.
+
+The MQ3 operates on a resistive heating principle and draws approximately 150\,mA continuously at its rated heater voltage. Because its sensor resistance requires sustained heating to reach a stable baseline, the MQ3 was kept powered throughout each experimental session. Its output voltage was read via a resistive voltage divider and converted to a parts-per-million ethanol estimate using a log-linear calibration curve. The calibration reference resistance $R_0$ was determined during a separate pre-experiment calibration procedure and stored in NVS.
+
+\section{Experimental Setup}
+
+\subsection{Environmental Test Chamber}
+
+A custom environmental test chamber was designed in Inkscape, cut from sheet material using a laser cutter, and assembled by hand. The chamber enclosed the strawberry samples and the two inside sensor nodes in a controlled atmosphere. Temperature was regulated by a 220\,V, 100\,W resistive heater; humidity was regulated by an ultrasonic humidifier connected to a water tank. Both parameters were monitored and controlled by an STC-3028 dual-function temperature and humidity controller, which cycled the heater and humidifier independently to maintain the target setpoints throughout each experiment. Figure~\ref{fig:experimental_setup} shows the experimental arrangement.
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][8cm][c]{0.72\textwidth}{\centering\small\textit{[Insert photo of experimental setup here: chamber, sensor nodes at their three positions, Raspberry Pi 5 camera mounted above]}\vspace{0.5em}}}
+    \caption{Experimental test chamber showing the sensor nodes at their three positions and the Raspberry Pi 5 camera mounted above for hourly image capture.}
+    \label{fig:experimental_setup}
+\end{figure}
+
+\subsection{Sensor Node Placement}
+
+The three nodes were positioned as follows. The master node was placed outside the chamber, connected to the Raspberry Pi via UART and receiving data from the two inside nodes over ESP-NOW. The first sensing node was positioned beside the strawberry samples inside the chamber. The second sensing node was positioned below the produce level, consistent with the sensor placement rationale from Chapter~\ref{chap:conceptual_model}: VOC compounds denser than air accumulate near the base of enclosed low-airflow spaces, and a below-produce sensor captures higher VOC concentrations than one mounted at produce height \cite{Zhang2026}.
+
+The ESP-NOW timing was synchronised between all three nodes: each sensing node transmitted its packet to the master during the master's 90-second receive window following its own 45-second warm-up, and the master returned a timing correction packet to each node adjusting its next sleep duration. This feedback mechanism ensured the nodes remained synchronised across duty cycles without requiring any external clock source.
+
+\subsection{Ground-Truth Labelling}
+
+A Raspberry Pi 5 with a camera module was mounted above the chamber and configured to capture an image of the strawberry batch at one-hour intervals. This camera served exclusively as a ground-truth labelling instrument. A reading was labelled as high risk (class 1) if any mould was visible in the corresponding image, including early microscopic growth at the surface of the fruit; readings captured before any mould appeared were labelled low risk (class 0). The label transition was applied at the earliest image in which any mould was visible, so that the positive-class sensor readings corresponded to the environmental signature of mould onset rather than established spoilage.
+
+The 15-minute sensor interval and one-hour camera interval meant that up to four consecutive sensor readings shared the same label. Labels were assigned conservatively to avoid the positive class beginning earlier than the visual evidence supported.
+
+\section{Energy Measurement Methodology}
+
+A Nordic Semiconductor Power Profiler Kit II (PPK2) served simultaneously as the regulated power supply and the precision current measurement instrument. The node was powered exclusively through the PPK2 at \SI{3.3}{\volt}, removing battery voltage variation as a measurement variable. The PPK2 logged current at sufficient temporal resolution to capture both brief computational transients and the sustained draw of the MQ3 heater throughout the measurement window. Figure~\ref{fig:ppk2_setup} shows the measurement configuration.
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][7cm][c]{0.72\textwidth}{\centering\small\textit{[Insert photo of PPK2 measurement setup here: PPK2 connected to sensor node, showing supply and measurement configuration]}}}
+    \caption{PPK2 power analyser connected to the sensor node, acting as both the regulated supply and the current measurement instrument throughout all energy experiments.}
+    \label{fig:ppk2_setup}
+\end{figure}
+
+Energy was measured across three distinct operational phases:
+
+\begin{enumerate}
+    \item \textbf{Baseline sensing} (SQ1): the node woke, completed the 45-second SGP30 warm-up, read all sensors, and returned to deep sleep with no ML execution. This isolated the irreducible energy cost of the sensing hardware.
+    \item \textbf{Inference} (SQ2): one forward pass through the trained network followed sensor sampling. Measured for all three frameworks.
+    \item \textbf{Training} (SQ2): one complete on-device training cycle. For AIfES, this was a full forward and backward pass over the training dataset. For TinyOL, this was an output-layer weight update over the fine-tuning dataset. TF Lite Micro performs no on-device training and was not measured for this phase.
+\end{enumerate}
+
+Each phase was repeated across multiple cycles and the mean energy per operation was used. Battery lifetime (SQ4) was estimated analytically from these per-phase figures and the duty cycle described in Section~\ref{sec:deployment_model}, without live battery discharge testing \cite{Rodrigues2017}.
+
+\section{Machine Learning Implementation}
+
+\subsection{Neural Network Architecture}
+
+All three frameworks ran the same feed-forward neural network, shown in Figure~\ref{fig:nn_architecture}. The network takes ten inputs drawn from the two inside sensor nodes and produces a single binary output. Each node contributes four measurements --- temperature, relative humidity, TVOC index, and MQ3 ethanol ppm --- plus a TVOC delta feature representing the change in TVOC between the current reading and the previous one ($\Delta\text{TVOC} = \text{TVOC}[t] - \text{TVOC}[t-1]$, set to zero for the first reading in each batch). The TVOC delta captures the rate of change of volatile organic compound concentration, providing temporal context that the instantaneous reading alone does not carry. The outside master node and the eCO\textsubscript{2} channel from the SGP30 were both excluded from the feature set: the master's readings reflect ambient conditions outside the chamber, and eCO\textsubscript{2} was found during dataset preparation to add no predictive value over the TVOC channel alone.
+
+A single hidden layer of 16 neurons with ReLU activation was used, giving a total of 193 trainable parameters: $10 \times 16 + 16 = 176$ in the hidden layer and $16 \times 1 + 1 = 17$ in the output layer. The output neuron uses sigmoid activation.
+
+A classification threshold of 0.45 was applied at inference time. Rather than the conventional 0.5, this value was selected empirically by evaluating accuracy across a sweep of threshold values on a held-out validation set. A threshold below 0.5 increases classifier sensitivity (reducing false negatives), which is operationally appropriate for mould detection: missing a true mould condition is a more costly error than triggering an unnecessary inspection.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    inode/.style={circle, draw, fill=gray!20,  minimum size=0.52cm, inner sep=0pt},
+    hnode/.style={circle, draw, fill=blue!20,  minimum size=0.52cm, inner sep=0pt},
+    onode/.style={circle, draw, fill=green!25, minimum size=0.52cm, inner sep=0pt}
+]
+% Input layer (10 nodes, 0.5 spacing)
+\foreach \i/\y in {1/2.25, 2/1.75, 3/1.25, 4/0.75, 5/0.25,
+                   6/-0.25, 7/-0.75, 8/-1.25, 9/-1.75, 10/-2.25}
+    \node[inode] (in\i) at (0, \y) {};
+% Hidden layer (16 nodes, 0.5 spacing)
+\foreach \j/\y in {1/3.75,  2/3.25,  3/2.75,  4/2.25,
+                   5/1.75,  6/1.25,  7/0.75,  8/0.25,
+                   9/-0.25, 10/-0.75, 11/-1.25, 12/-1.75,
+                   13/-2.25, 14/-2.75, 15/-3.25, 16/-3.75}
+    \node[hnode] (h\j) at (4.5, \y) {};
+% Output node
+\node[onode] (out) at (9, 0) {};
+% Connections (drawn first, behind nodes)
+\foreach \i in {1,...,10}
+    \foreach \j in {1,...,16}
+        \draw[gray!22, very thin] (in\i) -- (h\j);
+\foreach \j in {1,...,16}
+    \draw[gray!40, very thin] (h\j) -- (out);
+% Input labels (subscript 1 = beside node, subscript 2 = below node)
+\node[left=0.2cm, font=\scriptsize] at (in1)  {Temp$_1$};
+\node[left=0.2cm, font=\scriptsize] at (in2)  {RH$_1$};
+\node[left=0.2cm, font=\scriptsize] at (in3)  {TVOC$_1$};
+\node[left=0.2cm, font=\scriptsize] at (in4)  {MQ3$_1$};
+\node[left=0.2cm, font=\scriptsize] at (in5)  {$\Delta$TVOC$_1$};
+\node[left=0.2cm, font=\scriptsize] at (in6)  {Temp$_2$};
+\node[left=0.2cm, font=\scriptsize] at (in7)  {RH$_2$};
+\node[left=0.2cm, font=\scriptsize] at (in8)  {TVOC$_2$};
+\node[left=0.2cm, font=\scriptsize] at (in9)  {MQ3$_2$};
+\node[left=0.2cm, font=\scriptsize] at (in10) {$\Delta$TVOC$_2$};
+% Grouping braces
+\draw[decorate, decoration={brace, mirror, amplitude=4pt}]
+    (-1.6, 2.50) -- (-1.6, 0.0)
+    node[midway, left=6pt, font=\scriptsize, align=right] {Node 1\\(beside)};
+\draw[decorate, decoration={brace, mirror, amplitude=4pt}]
+    (-1.6, 0.0) -- (-1.6, -2.50)
+    node[midway, left=6pt, font=\scriptsize, align=right] {Node 2\\(below)};
+% Output label
+\node[right=0.25cm, font=\scriptsize, align=left] at (out) {Mould\\Risk};
+% Layer labels
+\node[font=\scriptsize\itshape, align=center] at (0,   -3.1) {Input (10)};
+\node[font=\scriptsize\itshape, align=center] at (4.5, -4.6) {Hidden (16, ReLU)};
+\node[font=\scriptsize\itshape, align=center] at (9,   -1.0) {Output\\(1, Sigmoid)};
+\end{tikzpicture}
+\caption{Neural network architecture used across all three TinyML framework variants (193 parameters total). Subscript 1 denotes the node beside the strawberries; subscript 2 denotes the node below the produce level. For TF Lite Micro all weights are frozen post-deployment. For TinyOL the hidden layer is frozen and only the 17 output-layer parameters are updated on-device. For AIfES all 193 weights are trained from scratch on the ESP32.}
+\label{fig:nn_architecture}
+\end{figure}
+
+\subsection{Dataset}
+
+Data was collected across five separate experimental batches. Batches 1 through 4 (1278 samples: 607 mould, 671 no-mould) formed the combined training pool. Batch 5 (332 samples) was withheld as the held-out test set and was never used during any stage of training or validation for any framework, ensuring an uncontaminated evaluation.
+
+\subsection{Feature Engineering}
+
+Raw sensor readings were not passed directly to the network. Each input feature was normalised to the range $[0, 1]$ using min-max scaling fitted on the training set (Batches 1--4):
+
+\begin{equation}
+    x_{\text{norm}} = \frac{x_{\text{raw}} - x_{\text{min}}}{x_{\text{max}} - x_{\text{min}}}
+    \label{eq:minmax}
+\end{equation}
+
+The scaling parameters were fixed at training time and embedded in firmware, so the same transformation was applied at inference without any runtime fitting. Values outside the training range were clipped to $[0, 1]$.
+
+In addition to the four raw sensor channels per node (temperature, relative humidity, TVOC, MQ3 ppm), a TVOC rate-of-change feature was computed for each inside node:
+
+\begin{equation}
+    \Delta\text{TVOC}[t] = \text{TVOC}[t] - \text{TVOC}[t-1]
+    \label{eq:delta_tvoc}
+\end{equation}
+
+with $\Delta\text{TVOC}[t] = 0$ for the first reading in each experimental batch. This temporal feature captures whether VOC concentration is actively rising, which is more directly indicative of accelerating fungal metabolic activity than the absolute reading alone. A static elevated-TVOC environment (stable baseline, $\Delta\text{TVOC} \approx 0$) carries different risk information than one in which concentrations are increasing rapidly.
+
+The eCO\textsubscript{2} channel from the SGP30 was collected and transmitted but excluded from the feature set after dataset analysis showed it provided no additional predictive information beyond the TVOC channel, to which it is strongly correlated on this sensor. The master node readings were likewise excluded, as the master was positioned outside the chamber and its readings reflected ambient laboratory conditions rather than the produce environment.
+
+The final feature vector therefore comprises ten values per sample: temperature, relative humidity, TVOC, MQ3 ppm, and $\Delta$TVOC from the beside node ($\times$5) and the below node ($\times$5).
+
+\subsection{TF Lite Micro}
+
+The network was trained offline on a desktop computer using TensorFlow on the full combined training dataset (Batches 1--4). The trained model was post-training quantised to 8-bit integer weights and converted to the \texttt{.tflite} format. The quantised model was embedded in the ESP32 firmware as a constant byte array and loaded into SRAM at runtime. TF Lite Micro performed one forward pass per sensing cycle; no weights were modified after deployment.
+
+\subsection{TinyOL}
+
+The TinyOL configuration used an intentionally weak backbone: the hidden layer was pre-trained on Batch 1 only (approximately 250 samples from a single high-temperature experimental condition), rather than on the full training pool. This was deliberate --- a backbone trained on all batches already generalised well to the test set, leaving no accuracy gap for on-device adaptation to close. By restricting backbone training to a single batch, the model underperformed on the colder, more varied conditions in Batch 5, creating a genuine improvement opportunity for the on-device fine-tuning step.
+
+On-device adaptation used Batch 4 (287 samples) as the fine-tuning dataset. Only the 17 output-layer parameters ($W_2 \in \mathbb{R}^{16}$, $b_2 \in \mathbb{R}$) were updated; the 176 hidden-layer weights remained frozen throughout. The optimiser was stochastic gradient descent (SGD) with a learning rate of 0.001, weighted binary cross-entropy loss, and class weights applied to counteract the 2:1 mould-to-no-mould imbalance in Batch 4. Training ran for 10 epochs with Fisher-Yates shuffling of the fine-tuning dataset before each epoch.
+
+\subsection{AIfES}
+
+For AIfES, no pre-trained weights were used. All 193 network parameters were initialised on the ESP32 using Glorot uniform initialisation and trained entirely on-device. The optimiser was Adam with a learning rate of 0.001 and binary cross-entropy loss. Training ran for 20 epochs over the full combined training dataset (1278 samples) using a mini-batch size of 4. A per-epoch Fisher-Yates shuffle was applied to the training data using the ESP32 hardware random number generator.
+
+A batch size of 4 (rather than online stochastic gradient descent with batch size 1) was required to prevent numerical instability: with batch size 1, the Adam squared-gradient accumulator approached zero for near-constant input features, causing division overflow on epoch 20. Averaging the gradients over 4 samples before each parameter update kept the accumulator well away from zero. This is the standard remedy for online Adam instability when gradient clipping is unavailable.
+
+\section{Deployment Model and Battery Lifetime Estimation}\label{sec:deployment_model}
+
+The operational scenario modelled for SQ4 is a duty-cycled node that wakes at 15-minute intervals, completes the SGP30 warm-up, reads all sensors, runs inference (or a scheduled training cycle), and returns to deep sleep. Figure~\ref{fig:duty_cycle} illustrates one complete cycle schematically.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\def\sw{7.8}
+\def\wuw{1.6}
+\def\sew{0.55}
+\def\cw{0.65}
+\def\h{0.75}
+% Sleep bar
+\fill[gray!22] (0,0) rectangle (\sw,\h);
+\draw (0,0) rectangle (\sw,\h);
+\node[font=\small] at (\sw/2, \h/2) {Deep Sleep};
+% Warm-up bar
+\fill[yellow!40] (\sw,0) rectangle (\sw+\wuw,\h);
+\draw (\sw,0) rectangle (\sw+\wuw,\h);
+\node[font=\scriptsize, align=center] at (\sw+\wuw/2, \h/2) {SGP30\\Warm-up};
+% Sense bar
+\fill[orange!40] (\sw+\wuw,0) rectangle (\sw+\wuw+\sew,\h);
+\draw (\sw+\wuw,0) rectangle (\sw+\wuw+\sew,\h);
+\node[font=\scriptsize, align=center, rotate=90] at (\sw+\wuw+\sew/2, \h/2) {Read};
+% Compute bar
+\fill[blue!28] (\sw+\wuw+\sew,0) rectangle (\sw+\wuw+\sew+\cw,\h);
+\draw (\sw+\wuw+\sew,0) rectangle (\sw+\wuw+\sew+\cw,\h);
+\node[font=\scriptsize, align=center] at (\sw+\wuw+\sew+\cw/2, \h/2) {Infer /\\Train};
+% Continuation
+\node[font=\large] at (\sw+\wuw+\sew+\cw+0.35, \h/2) {$\cdots$};
+% Cycle bracket
+\draw[<->] (0, \h+0.35) -- (\sw+\wuw+\sew+\cw, \h+0.35)
+    node[midway, above, font=\scriptsize] {15 minutes (not to scale)};
+% Duration labels
+\draw[<->] (0,-0.35) -- (\sw,-0.35)
+    node[midway, below, font=\scriptsize] {$\sim$14\,min (deep sleep)};
+\draw[<->] (\sw,-0.35) -- (\sw+\wuw,-0.35)
+    node[midway, below, font=\scriptsize] {45\,s (warm-up)};
+\draw[<->] (\sw+\wuw,-0.35) -- (\sw+\wuw+\sew+\cw,-0.35)
+    node[midway, below, font=\scriptsize] {$<$15\,s};
+\end{tikzpicture}
+\caption{Schematic duty cycle for one 15-minute sampling interval (not to scale). The SGP30 warm-up phase at 45\,s dominates the active window. For AIfES, a training cycle replaces inference once every 24 hours.}
+\label{fig:duty_cycle}
+\end{figure}
+
+Battery lifetime was estimated analytically from the measured per-phase current consumption figures. For a battery of capacity $Q$ (in \si{\milli\ampere\hour}), estimated runtime $T$ in hours is:
+
+\begin{equation}
+    T = \frac{Q}{I_{\text{avg}}}
+    \label{eq:battery_lifetime}
+\end{equation}
+
+where $I_{\text{avg}}$ is the average current over one complete 15-minute cycle, computed as the time-weighted mean across all operational phases:
+
+\begin{equation}
+    I_{\text{avg}} = \frac{\displaystyle\sum_{i} I_i \cdot t_i}{\displaystyle\sum_{i} t_i}
+    \label{eq:avg_current}
+\end{equation}
+
+with $I_i$ and $t_i$ denoting the mean current and duration of phase $i$ respectively. Two hardware configurations were modelled: the measured prototype with the MQ3, and an improved configuration in which the MQ3 is replaced by a lower-power MEMS gas sensor. The MQ3's continuous \SI{150}{\milli\ampere} heater current dominates the power budget; the improved configuration was modelled analytically from published datasheet figures for a representative MEMS alternative rather than measured directly.
