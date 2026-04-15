@@ -109,7 +109,21 @@ void setup() {
 
     buildModel();
     Serial.println("\nModel built and weights loaded.");
-    Serial.println("Starting in 2 seconds... (start PPK2 now)");
+
+    // -----------------------------------------------------------------------
+    // RAM snapshot BEFORE benchmark (outside PPK2 window — does not affect energy)
+    // -----------------------------------------------------------------------
+    uint32_t heap_total  = ESP.getHeapSize();
+    uint32_t heap_before = ESP.getFreeHeap();
+    uint32_t heap_used   = heap_total - heap_before;
+    Serial.println("\n--- Memory (before benchmark) ---");
+    Serial.printf("  Heap total       : %6u B  (%4.1f KB)\n", heap_total,  heap_total  / 1024.0f);
+    Serial.printf("  Heap free        : %6u B  (%4.1f KB)\n", heap_before, heap_before / 1024.0f);
+    Serial.printf("  Heap used        : %6u B  (%4.1f KB)\n", heap_used,   heap_used   / 1024.0f);
+    Serial.printf("  Weights in flash : %6u B  (%4.1f KB)  [static array, not heap]\n",
+                  AIFES_N_WEIGHTS * 4, AIFES_N_WEIGHTS * 4 / 1024.0f);
+
+    Serial.println("\nStarting in 2 seconds... (start PPK2 now)");
     delay(2000);
 
     // -----------------------------------------------------------------------
@@ -145,10 +159,23 @@ void setup() {
     digitalWrite(LED_PIN, LOW);
     Serial.println("=== BENCHMARK END ===\n");
 
+    // RAM snapshot AFTER benchmark
+    uint32_t heap_after = ESP.getFreeHeap();
+    uint32_t min_heap   = ESP.getMinFreeHeap();  // lowest free heap seen since boot
+    Serial.println("--- Memory (after benchmark) ---");
+    Serial.printf("  Heap free after  : %6u B  (%4.1f KB)\n", heap_after, heap_after / 1024.0f);
+    Serial.printf("  Min free (peak)  : %6u B  (%4.1f KB)\n", min_heap,   min_heap   / 1024.0f);
+    Serial.printf("  Peak heap used   : %6u B  (%4.1f KB)\n",
+                  heap_total - min_heap, (heap_total - min_heap) / 1024.0f);
+    Serial.printf("  Heap leak        : %6d B  (before-after; 0 expected)\n",
+                  (int)heap_before - (int)heap_after);
+
     uint32_t elapsed_us       = t_end - t_start;
     float    us_per_inference = (float)elapsed_us / (float)total_samples;
     float    ms_per_inference = us_per_inference / 1000.0f;
     float    accuracy         = 100.0f * total_correct / total_samples;
+
+    uint32_t cpu_cycles_per_inf = (uint32_t)(us_per_inference * 240.0f);  // 240 MHz
 
     Serial.println("--- Results ---");
     Serial.printf("  Total inferences  : %u\n", total_samples);
@@ -156,6 +183,7 @@ void setup() {
     Serial.printf("  Accuracy          : %.1f%%\n", accuracy);
     Serial.printf("  Total time        : %u us (%.2f ms)\n", elapsed_us, elapsed_us / 1000.0f);
     Serial.printf("  Time/inference    : %.1f us (%.3f ms)\n", us_per_inference, ms_per_inference);
+    Serial.printf("  CPU cycles/inf    : ~%u cycles  (at 240 MHz)\n", cpu_cycles_per_inf);
     Serial.println("\nRecord PPK2 energy between BENCHMARK START and END.");
     Serial.println("Energy/inference = total_energy_uJ / total_inferences");
 }

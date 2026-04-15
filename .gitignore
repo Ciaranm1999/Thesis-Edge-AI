@@ -29,8 +29,31 @@ ENV/
 *.ipynb_checkpoints
 
 # VS Code
-.vscode/
+**/.vscode/*
+!.vscode/settings.json
 *.code-workspace
+
+# LaTeX
+ThesisReport/**/out/
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.run.xml
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.glsdefs
+*.ist
 
 # Logs
 *.log
