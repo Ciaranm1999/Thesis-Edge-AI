@@ -16,7 +16,7 @@ The final two factors carry the most weight in shaping the research questions. \
 
 The proposed system is a battery-powered sensor node --- an ESP32 microcontroller with DHT22, SGP30, and MQ3 sensors, running a neural network classifier entirely on-device without cloud connectivity. This single architecture is evaluated under three configurations corresponding to the three TinyML frameworks: TF Lite Micro (inference only, no on-device adaptation), TinyOL (partial adaptation of the final output layer), and AIfES (full on-device training with no pre-trained weights). The progression from inference-only to full training maps directly onto the progression from connectivity dependence to full autonomy identified in the literature. Figure~\ref{fig:conceptual_model} illustrates this architecture.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
     sensor/.style={draw, rectangle, rounded corners=3pt, minimum width=2.6cm, minimum height=0.8cm, fill=gray!12, font=\small, align=center},

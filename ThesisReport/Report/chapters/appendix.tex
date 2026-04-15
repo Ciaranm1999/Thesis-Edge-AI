@@ -1,0 +1,115 @@
+\chapter*{Appendix}\label{appendix}
+\addcontentsline{toc}{chapter}{Appendix}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{A\quad Experimental Batch Details}
+\addcontentsline{toc}{section}{A\quad Experimental Batch Details}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Five experimental batches of fresh strawberries (\textit{Fragaria ananassa}) inoculated with \textit{Botrytis cinerea} were collected between February and March 2026. All batches were conducted in the custom-built environmental test chamber described in Chapter~\ref{chap:research}. Table~\ref{tab:app_batches} lists the confirmed mould-onset timestamp, sample count, and data quality notes for each batch.
+
+\begin{table}[htbp]
+\centering
+\caption{Experimental batch details. Onset timestamp is the earliest camera image in which mould was visible. Samples are readings at 15-minute intervals across the three-node sensing system.}
+\label{tab:app_batches}
+\begin{tabular}{|c|c|p{0.18\textwidth}|c|c|p{0.22\textwidth}|}
+\hline
+\textbf{Batch} & \textbf{Regime} & \textbf{Mould Onset} & \textbf{Pre-onset} & \textbf{Post-onset} & \textbf{Total / Notes} \\
+\hline
+1 & High-temp & 2026-02-22 10:10 & 145 & 100 & 245; Node~1 TVOC near ceiling at start \\
+\hline
+2 & High-temp & 2026-02-27 14:18 & 176 & 218 & 394; all inside-node TVOC saturated; median-imputed \\
+\hline
+3 & High-temp & 2026-03-07 14:45 & 256 & 110 & 366; cleanest batch, used as backbone validation set \\
+\hline
+4 & Low-temp  & 2026-03-11 14:42 & 95  & 193 & 288; TinyOL fine-tuning and AIfES full training corpus \\
+\hline
+5 & Low-temp  & 2026-03-19 01:57 & 222 & 138 & 360; Node~2 near-saturated pre-onset \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Total}} & \textbf{894} & \textbf{759} & \textbf{1,653} \\
+\hline
+\end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{B\quad PPK2 Raw Energy Measurements}
+\addcontentsline{toc}{section}{B\quad PPK2 Raw Energy Measurements}
+% ─────────────────────────────────────────────────────────────────────────────
+
+All ML energy measurements were obtained with a Nordic Semiconductor PPK2 operating at \SI{3.3}{\volt} and repeated across three independent runs. Table~\ref{tab:app_raw_energy} lists the raw window energy (total current in the detected operation window) and the ML-only energy (idle baseline subtracted) for each framework.
+
+The idle baseline was measured as the mean current during deep-sleep periods in the same PPK2 trace and subtracted from the window mean before computing ML-only energy. This isolates the incremental cost of the ML operation from the continuous sensor and DevKit draw.
+
+\begin{table}[htbp]
+\centering
+\caption{PPK2 raw energy measurements (mean $\pm$ SD across 3 runs). Raw energy is the total energy in the detected operation window. ML-only energy subtracts the idle baseline. Values used in Table~\ref{tab:ml_summary} are the ML-only figures.}
+\label{tab:app_raw_energy}
+\begin{tabular}{|p{0.28\textwidth}|c|c|c|}
+\hline
+\textbf{Framework} & \textbf{Runs} & \textbf{Raw window energy} & \textbf{ML-only energy} \\
+\hline
+AIfES inference (float32)      & 3 & $19{,}633 \pm 167$\,nJ   & $6{,}305 \pm 161$\,nJ \\
+\hline
+TF Lite Micro inference (INT8) & 3 & $30{,}182 \pm 453$\,nJ   & $8{,}881 \pm 466$\,nJ \\
+\hline
+TinyOL output-layer update     & 3 & $5{,}725 \pm 194$\,nJ    & $1{,}810 \pm 198$\,nJ \\
+\hline
+AIfES full training (per step) & 3 & $759{,}963 \pm 12{,}259$\,nJ & $194{,}816 \pm 13{,}888$\,nJ \\
+\hline
+\end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{C\quad PPK2 Energy Trace Plots}
+\addcontentsline{toc}{section}{C\quad PPK2 Energy Trace Plots}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Figures~\ref{fig:app_aifes_traces}--\ref{fig:app_aifes_full_traces} show the PPK2 current traces for each framework. Each plot overlays all three independent runs. The shaded orange region marks the automatically detected operation window used to compute the energy figures in Table~\ref{tab:app_raw_energy}. The window is detected by identifying the step-change in current that corresponds to the start and end of each ML operation. The thin lines are raw PPK2 samples; the thick lines are Gaussian-smoothed for visual clarity.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{aifes_traces.png}
+    \caption{PPK2 current traces for AIfES float32 inference across three runs. The step increase above idle marks the forward-pass window. Run-to-run variation is minimal ($\pm$167\,nJ), confirming measurement stability.}
+    \label{fig:app_aifes_traces}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{tflm_traces.png}
+    \caption{PPK2 current traces for TF Lite Micro INT8 inference across three runs. The window is wider and the current elevation higher than AIfES despite INT8 quantisation, consistent with the interpreter overhead discussed in Section~\ref{subsec:res_energy_latency}.}
+    \label{fig:app_tflm_traces}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{tinyol_traces.png}
+    \caption{PPK2 current traces for TinyOL output-layer updates across three runs. The very short window duration reflects the 17-parameter update, the lowest-energy operation of the four configurations.}
+    \label{fig:app_tinyol_traces}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{aifes_full_training_traces.png}
+    \caption{PPK2 current traces for AIfES full on-device training across three runs. The extended window reflects the full forward and backward pass over all 193 parameters with Adam optimiser gradient accumulation.}
+    \label{fig:app_aifes_full_traces}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{D\quad Code and Data Availability}
+\addcontentsline{toc}{section}{D\quad Code and Data Availability}
+% ─────────────────────────────────────────────────────────────────────────────
+
+All source code, firmware, training scripts, and analysis notebooks produced for this thesis are publicly available at:
+
+\begin{center}
+    \url{https://github.com/Ciaranm1999/Thesis-Edge-AI}
+\end{center}
+
+The repository is organised as follows:
+
+\begin{itemize}
+    \item \texttt{ESP32/} --- PlatformIO firmware projects for all four ML configurations (AIfES inference, TF Lite Micro, TinyOL, AIfES full on-device training) and baseline sensing firmware.
+    \item \texttt{RaspberryPi/} --- Python scripts for UART data collection from the master node, CSV logging, and analysis notebooks including \texttt{batch\_analysis.ipynb} (dataset exploration and quality assessment) and \texttt{energy\_analysis.ipynb} (CPU frequency PPK2 analysis).
+    \item \texttt{ML\_Training/} --- Offline model training scripts (TensorFlow, scikit-learn), model export pipelines for TFLM and AIfES, and \texttt{energy\_analysis.ipynb} (ML framework PPK2 energy benchmarking).
+    \item \texttt{ThesisReport/} --- \LaTeX{} source for this thesis document and all generated figures.
+\end{itemize}

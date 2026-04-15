@@ -1,0 +1,92 @@
+\chapter{Conclusions and Recommendations}\label{cap:conclusions_recommendations}
+
+This chapter draws together the findings of the thesis, provides direct answers to the research questions, and sets out recommendations for future work.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusions}\label{sec:conclusions}
+% ─────────────────────────────────────────────────────────────────────────────
+
+This thesis investigated the energy cost of TinyML framework execution on an ESP32-based autonomous mould detection node, comparing inference-only, output-layer adaptation, and full on-device training approaches across energy, latency, memory, and prediction accuracy. The work was motivated by the practical need for disconnected, battery-powered monitoring of post-harvest conditions in environments where cloud connectivity and manual maintenance cannot be assumed.
+
+\subsection{Answer to the Primary Research Question}
+
+\textit{What is the energy cost of full on-device neural network training compared to partial adaptation and inference-only execution on an ESP32, and when is that cost operationally justified?}
+
+Full on-device training with AIfES consumes \SI{194.8}{\micro\joule} per gradient step --- approximately 31$\times$ more than AIfES inference (\SI{6.3}{\micro\joule}) and 107$\times$ more than a TinyOL output-layer update (\SI{1.8}{\micro\joule}). In relative terms, the gap is large. In absolute terms, it is irrelevant: across 96 sensing cycles per day, even daily full retraining consumes less than \SI{1.25}{\joule}, which represents 0.06\% of the total daily energy budget of a redesigned sensing node. The energy cost of on-device training is, in practice, never the reason to avoid it.
+
+The question of when full training is \textit{justified} is therefore not an energy question but a deployment question. Full on-device training is the appropriate choice when no labelled training data exists in advance and no external infrastructure is available to supply a pre-trained model. Inference-only deployment achieves substantially higher accuracy (94.0\% versus 77.1\%) and should be preferred whenever a pre-trained model can be loaded before deployment. Output-layer adaptation via TinyOL is the appropriate intermediate: it extends a pre-trained model to new environmental conditions without any external connection, at the cost of some accuracy reduction from the full inference baseline.
+
+The dominant energy constraint in this system is the sensing hardware, not the machine learning. The MQ3 ethanol sensor heater alone consumes 61.5\% of total node current at \SI{103.3}{\milli\ampere} per node. Until this is addressed, no machine learning optimisation has any meaningful effect on battery lifetime.
+
+\subsection{Answers to Sub-Questions}
+
+\textbf{SQ1 --- Baseline sensing energy.} The baseline average current is \SI{168.1}{\milli\ampere} per slave node (\SI{528}{\milli\ampere} for the full three-node mesh). The MQ3 heater and the continuously-powered SGP30 (\SI{48}{\milli\ampere}) together account for 90.0\% of this. The ESP32 microcontroller, DHT22, and ESP-NOW wireless communication together contribute under 5\%. Reducing ESP32 clock speed from 240\,MHz to 80\,MHz changes node current by less than 0.5\%, confirming that the energy bottleneck is entirely in the sensing hardware rather than the processor or firmware.
+
+\textbf{SQ2 --- ML framework energy.} AIfES inference (\SI{6.3}{\micro\joule} per forward pass) outperforms INT8-quantised TF Lite Micro (\SI{8.9}{\micro\joule}) by 29\% despite using unquantised float32 arithmetic. This counterintuitive result is explained by two factors: the network is small enough (193 parameters) that the TFLM interpreter's runtime overhead exceeds the quantisation saving, and the ESP32's Xtensa LX6 hardware FPU accelerates AIfES's float32 matrix operations in a way that TFLM's integer kernels cannot exploit. TinyOL's output-layer update is the cheapest individual operation at \SI{1.8}{\micro\joule}. AIfES full training is 107$\times$ more expensive per step than TinyOL. All frameworks are operationally negligible relative to sensing hardware energy.
+
+\textbf{SQ3 --- Mould prediction accuracy.} AIfES inference achieved 94.0\% accuracy on the held-out test set (precision: 96.9\%, recall: 92.4\%, F1: 0.903). TF Lite Micro matched this closely at 93.7\%. TinyOL achieved 86.1\% following output-layer fine-tuning from a deliberately limited backbone, demonstrating that the adaptation mechanism is effective but that the absolute accuracy depends heavily on backbone quality. AIfES full on-device training achieved 77.1\%, the lowest of the four configurations, primarily due to the practical constraints of embedded training: mini-batch size constrained to 4, no learning-rate scheduling, no early stopping, and only 20 epochs. These are engineering limitations, not fundamental barriers to on-device training.
+
+\textbf{SQ4 --- Battery lifetime.} Battery lifetime is determined entirely by hardware configuration; all four ML frameworks produce runtimes within 0.1\% of each other. The current prototype, with the MQ3 heater included, lasts approximately 16~hours on a 10,000\,mAh battery --- not viable for unattended deployment. Replacing the MQ3 with a low-power MEMS gas sensor and MOSFET-gating the SGP30 extends this to 4.2~days on the same battery, requiring no PCB redesign. A full hardware redesign including a custom PCB and efficient LDO regulator extends runtime further to 7.1~days, enabling bi-weekly serviced deployments in the field.
+
+\subsection{Broader Observations}
+
+The sensor data collected across five experimental batches revealed a consistent TVOC detection threshold for \textit{Botrytis cinerea}: Node~1 TVOC at onset clustered between approximately 5,700 and 9,200\,ppb across three independent batches conducted at different temperature regimes. This consistency across conditions suggests that a simple TVOC threshold-based alert could act as a lightweight pre-classifier independent of any machine learning model, and is a finding with potential practical value beyond the ML comparison.
+
+The finding that AIfES float32 outperforms TFLM INT8 on a small ESP32 network has broader implications for TinyML framework selection. The common assumption that INT8 quantisation reduces inference cost does not hold universally at small network scales on microcontrollers with hardware FPUs. Practitioners deploying small classifiers on the ESP32 or similar Xtensa-based devices should benchmark both float32 and INT8 paths rather than assuming quantisation is beneficial.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Recommendations for Future Work}\label{sec:recommendations}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Hardware Redesign}
+
+The most impactful near-term improvement is hardware. The MQ3 ethanol sensor should be replaced with a low-power MEMS gas sensor, and the SGP30 should be duty-gated with a MOSFET. These two changes alone reduce mesh current by approximately 90\% and make battery-powered autonomous deployment viable without any changes to firmware or ML models. A subsequent custom PCB redesign, eliminating the DevKit board LDO and USB-UART overhead, reduces current further and extends deployment intervals from weekly to bi-weekly servicing.
+
+A longer-term hardware consideration is whether a dedicated ethanol sensor is necessary at all. TVOC and ethanol concentrations follow correlated onset trajectories during \textit{Botrytis cinerea} growth, suggesting that a sufficiently sensitive and selective broadband VOC sensor could render the MQ3 redundant entirely. A single-sensor VOC node would reduce hardware complexity, eliminate the thermal stabilisation challenge of the MQ3 heater, and further simplify the energy budget.
+
+\subsection{Dataset and Generalisation}
+
+The dataset underlying this thesis consists of five batches of a single produce type (\textit{Fragaria ananassa}) infected with a single fungal species (\textit{Botrytis cinerea}) under controlled laboratory conditions. Before the system can be considered for real deployment, the sensor and model should be validated across:
+
+\begin{itemize}
+    \item Additional produce types relevant to cold chain logistics (e.g.\ tomatoes, grapes, blueberries).
+    \item Additional fungal pathogens common to post-harvest storage.
+    \item Real cold chain environments, including refrigerated vehicles, warehouse cold stores, and field storage facilities, where temperature dynamics are more complex and variable than in the laboratory.
+    \item Longer and more diverse held-out test sets to reduce the sampling variance inherent in the 332-sample test set used here.
+\end{itemize}
+
+\subsection{On-Device Training Improvements}
+
+The 77.1\% accuracy achieved by AIfES full on-device training is a baseline under constrained conditions, not an upper bound. Several targeted improvements could close the gap to offline-trained accuracy:
+
+\begin{itemize}
+    \item \textbf{Gradient clipping} to prevent Adam optimiser instability during early epochs.
+    \item \textbf{Learning-rate scheduling} (e.g.\ cosine decay) to improve convergence in the later epochs that are currently underperforming.
+    \item \textbf{Larger mini-batch support} through memory-efficient streaming, which would provide more stable gradient estimates than the mini-batch of 4 used in this work.
+    \item \textbf{Early stopping} based on a small retained validation buffer, preventing overfitting in the absence of a large training set.
+\end{itemize}
+
+\subsection{Autonomous Label Generation}
+
+The most significant practical barrier to deploying AIfES full on-device training in the field is not energy, memory, or accuracy --- it is labelling. In this thesis, training labels were derived from camera images reviewed by the researcher. A field-deployed node has no camera and no continuous human supervision, so it cannot assign class labels to its own sensor readings without an external signal.
+
+The most natural solution is a TVOC-threshold auto-labeller, and the evidence for it is already present in this thesis. Section~\ref{subsec:res_onset} found that Node~1 TVOC at mould onset clustered consistently between approximately 5,700 and 9,200\,ppb across three independent batches conducted at different temperature regimes. A node could use this threshold as a weak label source: readings below the threshold are labelled class~0 (no mould risk), readings above it are labelled class~1 (mould risk onset). AIfES then trains on these auto-labelled samples, learning the fuller multi-variable signature --- including temperature, humidity, ethanol, and TVOC rate of change --- rather than the TVOC threshold alone.
+
+This threshold-first, network-second approach would make AIfES full on-device training genuinely autonomous without requiring any human input after deployment. Evaluating its label accuracy and downstream effect on classification performance is a concrete and tractable next step.
+
+\subsection{TinyOL Backbone Strength}
+
+The TinyOL result (86.1\%) was obtained from a deliberately weakened backbone trained on a single batch. In a real deployment, the backbone would be trained on all available pre-deployment data and TinyOL would be used for incremental field adaptation. Evaluating TinyOL with progressively stronger backbones --- and measuring how much adaptation benefit remains --- would give a clearer picture of when output-layer fine-tuning adds value in practice.
+
+\subsection{Field Validation}
+
+All results in this thesis were obtained under controlled laboratory conditions. A field validation study in a real cold chain environment --- even a small one, such as a single refrigerated vehicle route --- would provide evidence of whether the sensor node and trained models generalise beyond the laboratory, and whether the battery lifetime estimates derived from analytical modelling reflect actual discharge behaviour.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Closing Statement}\label{sec:closing}
+% ─────────────────────────────────────────────────────────────────────────────
+
+This thesis demonstrates that all three TinyML approaches --- inference, output-layer adaptation, and full on-device training --- are viable in terms of energy on an ESP32 microcontroller. Their energy costs differ by orders of magnitude per operation, but in the context of a sensor node whose daily energy budget is dominated by the sensing hardware, none of them matter for battery lifetime. The decision between frameworks is a decision about accuracy and deployment autonomy, not about energy.
+
+The path to a practical, battery-powered autonomous mould detection node is clear: address the sensing hardware first, choose the ML framework that matches the deployment scenario second. The experimental system built in this thesis demonstrates the feasibility of the approach and provides the energy, accuracy, and hardware measurements needed to make that path concrete.
+

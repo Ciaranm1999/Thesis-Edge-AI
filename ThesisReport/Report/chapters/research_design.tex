@@ -2,7 +2,7 @@
 
 This chapter describes the experimental methodology used to answer the research questions. The procedure followed four stages: hardware construction and sensor node assembly, data collection inside a custom-built environmental test chamber, implementation of each TinyML framework, and energy measurement across all operational phases. Figure~\ref{fig:experimental_procedure} summarises the overall sequence.
 
-\begin{figure}[H]
+\begin{figure}[tp]
 \centering
 \begin{tikzpicture}[
     process/.style={draw, rectangle, rounded corners=4pt, minimum width=9cm, minimum height=0.85cm,
@@ -34,20 +34,20 @@ This chapter describes the experimental methodology used to answer the research 
 
 Three sensor nodes were built, each on a custom printed circuit board integrating an ESP32 microcontroller with a DHT22 (temperature and relative humidity), an SGP30 (total VOC index and equivalent CO\textsubscript{2}), and an MQ3 (ethanol vapour). Firmware was developed and flashed using PlatformIO. Two nodes operated as sensing nodes, transmitting readings wirelessly to a third node designated as the master. The master collected its own sensor readings, received packets from both sensing nodes over the ESP-NOW protocol, and forwarded all data to a Raspberry Pi 5 over UART at 115200\,baud in JSON format. The master was the only node with a wired connection; the two sensing nodes communicated exclusively via ESP-NOW, with no infrastructure Wi-Fi required. Figure~\ref{fig:pcb} shows the assembled sensor node.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \fbox{\parbox[c][7cm][c]{0.72\textwidth}{\centering\small\textit{[Insert photo of assembled sensor node PCB here]}}}
+    \includegraphics[width=0.72\textwidth]{PCB.jpeg}
     \caption{Custom PCB integrating the ESP32 microcontroller with DHT22, SGP30, and MQ3 sensors. Three identical boards were produced.}
     \label{fig:pcb}
 \end{figure}
 
-To reduce idle power consumption, all nodes disabled Bluetooth at startup and reduced the CPU clock from 240\,MHz to 160\,MHz, as the lower frequency is sufficient for all sensing and ML operations while reducing dynamic power draw.
+To reduce idle power consumption, all nodes disabled Bluetooth at startup. The CPU clock was maintained at 240\,MHz; Section~\ref{subsec:res_cpu_freq} demonstrates that lower frequencies do not reduce average current in this configuration, because the continuous SGP30 load dominates the budget and the lower clock rate extends the active window, marginally increasing average current.
 
 \subsection{Sensor Configuration}
 
 The DHT22 was polled once per wake cycle using its standard single-wire protocol. The SGP30 communicates over I\textsuperscript{2}C and requires its metal oxide sensing element to be driven through a 45-second warm-up sequence before each measurement; this was implemented by calling the IAQ measurement function once per second for 45 seconds before recording the TVOC reading. The SGP30 also maintains an internal baseline calibration that improves over time; this baseline was written to ESP32 non-volatile storage (NVS) at the end of each wake cycle and restored on the following wake, preserving continuity across deep sleep intervals.
 
-The MQ3 operates on a resistive heating principle and draws approximately 150\,mA continuously at its rated heater voltage. Because its sensor resistance requires sustained heating to reach a stable baseline, the MQ3 was kept powered throughout each experimental session. Its output voltage was read via a resistive voltage divider and converted to a parts-per-million ethanol estimate using a log-linear calibration curve. The calibration reference resistance $R_0$ was determined during a separate pre-experiment calibration procedure and stored in NVS.
+The MQ3 operates on a resistive heating principle and draws approximately 150\,mA at its rated heater voltage of 5\,V; at the 3.3\,V operating voltage of this system, PPK2 measurement of all three MQ3 heaters simultaneously yielded 310\,mA total (103.3\,mA per node). Because its sensor resistance requires sustained heating to reach a stable baseline, the MQ3 was kept powered throughout each experimental session. Its output voltage was read via a resistive voltage divider and converted to a parts-per-million ethanol estimate using a log-linear calibration curve. The calibration reference resistance $R_0$ was determined during a separate pre-experiment calibration procedure and stored in NVS.
 
 \section{Experimental Setup}
 
@@ -55,9 +55,9 @@ The MQ3 operates on a resistive heating principle and draws approximately 150\,m
 
 A custom environmental test chamber was designed in Inkscape, cut from sheet material using a laser cutter, and assembled by hand. The chamber enclosed the strawberry samples and the two inside sensor nodes in a controlled atmosphere. Temperature was regulated by a 220\,V, 100\,W resistive heater; humidity was regulated by an ultrasonic humidifier connected to a water tank. Both parameters were monitored and controlled by an STC-3028 dual-function temperature and humidity controller, which cycled the heater and humidifier independently to maintain the target setpoints throughout each experiment. Figure~\ref{fig:experimental_setup} shows the experimental arrangement.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \fbox{\parbox[c][8cm][c]{0.72\textwidth}{\centering\small\textit{[Insert photo of experimental setup here: chamber, sensor nodes at their three positions, Raspberry Pi 5 camera mounted above]}\vspace{0.5em}}}
+    \includegraphics[width=0.72\textwidth]{Experimental_Setup.jpeg}
     \caption{Experimental test chamber showing the sensor nodes at their three positions and the Raspberry Pi 5 camera mounted above for hourly image capture.}
     \label{fig:experimental_setup}
 \end{figure}
@@ -70,7 +70,7 @@ The ESP-NOW timing was synchronised between all three nodes: each sensing node t
 
 \subsection{Ground-Truth Labelling}
 
-A Raspberry Pi 5 with a camera module was mounted above the chamber and configured to capture an image of the strawberry batch at one-hour intervals. This camera served exclusively as a ground-truth labelling instrument. A reading was labelled as high risk (class 1) if any mould was visible in the corresponding image, including early microscopic growth at the surface of the fruit; readings captured before any mould appeared were labelled low risk (class 0). The label transition was applied at the earliest image in which any mould was visible, so that the positive-class sensor readings corresponded to the environmental signature of mould onset rather than established spoilage.
+A Raspberry Pi 5 with a camera module was mounted above the chamber and configured to capture an image of the strawberry batch at one-hour intervals. This camera served exclusively as a ground-truth labelling instrument. A reading was labelled as high risk (class 1) if any mould was visible in the corresponding image, including early visible mould growth at the surface of the fruit; readings captured before any mould appeared were labelled low risk (class 0). The label transition was applied at the earliest image in which any mould was visible, so that the positive-class sensor readings corresponded to the environmental signature of mould onset rather than established spoilage.
 
 The 15-minute sensor interval and one-hour camera interval meant that up to four consecutive sensor readings shared the same label. Labels were assigned conservatively to avoid the positive class beginning earlier than the visual evidence supported.
 
@@ -78,9 +78,9 @@ The 15-minute sensor interval and one-hour camera interval meant that up to four
 
 A Nordic Semiconductor Power Profiler Kit II (PPK2) served simultaneously as the regulated power supply and the precision current measurement instrument. The node was powered exclusively through the PPK2 at \SI{3.3}{\volt}, removing battery voltage variation as a measurement variable. The PPK2 logged current at sufficient temporal resolution to capture both brief computational transients and the sustained draw of the MQ3 heater throughout the measurement window. Figure~\ref{fig:ppk2_setup} shows the measurement configuration.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \fbox{\parbox[c][7cm][c]{0.72\textwidth}{\centering\small\textit{[Insert photo of PPK2 measurement setup here: PPK2 connected to sensor node, showing supply and measurement configuration]}}}
+    \includegraphics[width=0.72\textwidth]{PPK2_Setup.jpeg}
     \caption{PPK2 power analyser connected to the sensor node, acting as both the regulated supply and the current measurement instrument throughout all energy experiments.}
     \label{fig:ppk2_setup}
 \end{figure}
@@ -105,7 +105,7 @@ A single hidden layer of 16 neurons with ReLU activation was used, giving a tota
 
 A classification threshold of 0.45 was applied at inference time. Rather than the conventional 0.5, this value was selected empirically by evaluating accuracy across a sweep of threshold values on a held-out validation set. A threshold below 0.5 increases classifier sensitivity (reducing false negatives), which is operationally appropriate for mould detection: missing a true mould condition is a more costly error than triggering an unnecessary inspection.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
     inode/.style={circle, draw, fill=gray!20,  minimum size=0.52cm, inner sep=0pt},
@@ -161,11 +161,11 @@ A classification threshold of 0.45 was applied at inference time. Rather than th
 
 \subsection{Dataset}
 
-Data was collected across five separate experimental batches. Batches 1 through 4 (1278 samples: 607 mould, 671 no-mould) formed the combined training pool. Batch 5 (332 samples) was withheld as the held-out test set and was never used during any stage of training or validation for any framework, ensuring an uncontaminated evaluation.
+Data was collected across five separate experimental batches. Batches 1 and 2 formed the primary fit set for the backbone model (AIfES inference and TF Lite Micro). Batch 3 was used exclusively as a validation set for early stopping during backbone training. Batch 4 (287 samples) was deliberately withheld from all backbone training and reserved for TinyOL on-device output-layer fine-tuning. AIfES full on-device training used all available training data --- Batches 1--4 (1278 samples) --- with no held-out validation set. In a real autonomous deployment there would be no infrastructure to support a validation set, and training ran for a fixed 20 epochs regardless of convergence. Batch 5 (332 samples) was withheld as the held-out test set and was never used during any stage of training or validation for any framework, ensuring an uncontaminated evaluation.
 
 \subsection{Feature Engineering}
 
-Raw sensor readings were not passed directly to the network. Each input feature was normalised to the range $[0, 1]$ using min-max scaling fitted on the training set (Batches 1--4):
+Raw sensor readings were not passed directly to the network. Each input feature was normalised to the range $[0, 1]$ using min-max scaling fitted on the backbone training set (Batches 1 and 2):
 
 \begin{equation}
     x_{\text{norm}} = \frac{x_{\text{raw}} - x_{\text{min}}}{x_{\text{max}} - x_{\text{min}}}
@@ -189,7 +189,7 @@ The final feature vector therefore comprises ten values per sample: temperature,
 
 \subsection{TF Lite Micro}
 
-The network was trained offline on a desktop computer using TensorFlow on the full combined training dataset (Batches 1--4). The trained model was post-training quantised to 8-bit integer weights and converted to the \texttt{.tflite} format. The quantised model was embedded in the ESP32 firmware as a constant byte array and loaded into SRAM at runtime. TF Lite Micro performed one forward pass per sensing cycle; no weights were modified after deployment.
+The network was trained offline on a desktop computer using TensorFlow on Batches~1 and~2, with Batch~3 used as a held-out validation set for early stopping. The trained model was post-training quantised to 8-bit integer weights and converted to the \texttt{.tflite} format. The quantised model was embedded in the ESP32 firmware as a constant byte array and loaded into SRAM at runtime. TF Lite Micro performed one forward pass per sensing cycle; no weights were modified after deployment.
 
 \subsection{TinyOL}
 
@@ -199,7 +199,7 @@ On-device adaptation used Batch 4 (287 samples) as the fine-tuning dataset. Only
 
 \subsection{AIfES}
 
-For AIfES, no pre-trained weights were used. All 193 network parameters were initialised on the ESP32 using Glorot uniform initialisation and trained entirely on-device. The optimiser was Adam with a learning rate of 0.001 and binary cross-entropy loss. Training ran for 20 epochs over the full combined training dataset (1278 samples) using a mini-batch size of 4. A per-epoch Fisher-Yates shuffle was applied to the training data using the ESP32 hardware random number generator.
+For AIfES, no pre-trained weights were used. All 193 network parameters were initialised on the ESP32 using Glorot uniform initialisation and trained entirely on-device. The optimiser was Adam with a learning rate of 0.001 and binary cross-entropy loss. Training ran for 20 epochs over the full training corpus (Batches~1--4, 1278 samples) with no validation set --- consistent with a real autonomous deployment where no labelled holdout would be available. A mini-batch size of 4 was used. A per-epoch Fisher-Yates shuffle was applied to the training data using the ESP32 hardware random number generator.
 
 A batch size of 4 (rather than online stochastic gradient descent with batch size 1) was required to prevent numerical instability: with batch size 1, the Adam squared-gradient accumulator approached zero for near-constant input features, causing division overflow on epoch 20. Averaging the gradients over 4 samples before each parameter update kept the accumulator well away from zero. This is the standard remedy for online Adam instability when gradient clipping is unavailable.
 
@@ -207,7 +207,7 @@ A batch size of 4 (rather than online stochastic gradient descent with batch siz
 
 The operational scenario modelled for SQ4 is a duty-cycled node that wakes at 15-minute intervals, completes the SGP30 warm-up, reads all sensors, runs inference (or a scheduled training cycle), and returns to deep sleep. Figure~\ref{fig:duty_cycle} illustrates one complete cycle schematically.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \begin{tikzpicture}
 \def\sw{7.8}
@@ -262,4 +262,4 @@ where $I_{\text{avg}}$ is the average current over one complete 15-minute cycle,
     \label{eq:avg_current}
 \end{equation}
 
-with $I_i$ and $t_i$ denoting the mean current and duration of phase $i$ respectively. Two hardware configurations were modelled: the measured prototype with the MQ3, and an improved configuration in which the MQ3 is replaced by a lower-power MEMS gas sensor. The MQ3's continuous \SI{150}{\milli\ampere} heater current dominates the power budget; the improved configuration was modelled analytically from published datasheet figures for a representative MEMS alternative rather than measured directly.
+with $I_i$ and $t_i$ denoting the mean current and duration of phase $i$ respectively. Two hardware configurations were modelled: the measured prototype with the MQ3, and an improved configuration in which the MQ3 is replaced by a lower-power MEMS gas sensor. The MQ3's continuous \SI{103.3}{\milli\ampere} per-node heater current dominates the power budget; the improved configuration was modelled analytically from published datasheet figures for a representative MEMS alternative rather than measured directly.
