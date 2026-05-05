@@ -23,24 +23,31 @@ Table~\ref{tab:batch_summary} summarises each batch's experimental regime, data 
 
 \begin{table}[H]
 \centering
-\caption{Summary of experimental batches --- regime, data quality, and ML pipeline role.}
+\caption{Summary of experimental batches --- regime, environmental conditions, data quality, and ML pipeline role. Temperature and relative humidity (RH) are the mean $\pm$ standard deviation recorded at Node~1 (inside the storage container, beside the produce) over the full batch duration.}
 \label{tab:batch_summary}
-\begin{tabular}{|c|p{0.10\textwidth}|c|p{0.36\textwidth}|p{0.22\textwidth}|}
+\begin{tabular}{|c|p{0.09\textwidth}|c|c|c|p{0.25\textwidth}|p{0.18\textwidth}|}
 \hline
-\textbf{Batch} & \textbf{Regime} & \textbf{Onset} & \textbf{Primary data quality note} & \textbf{ML role} \\
+\textbf{Batch} & \textbf{Regime} & \textbf{Onset} & \makecell{\textbf{Temp.}\\\textbf{(°C)}} & \makecell{\textbf{RH}\\\textbf{(\%)}} & \textbf{Primary data quality note} & \textbf{ML role} \\
 \hline
-1 & High-temp & $\approx$36\,h & Node~1 entered with elevated TVOC ($\approx$39,700\,ppb); close to sensor ceiling & Backbone fit set \\
+1 & High-temp & $\approx$36\,h & $33.8{\pm}0.5$ & $67.7{\pm}3.8$ & Node~1 entered with elevated TVOC ($\approx$39,700\,ppb); close to sensor ceiling & Backbone fit set \\
 \hline
-2 & High-temp & $\approx$44\,h & All inside-node TVOC saturated throughout; TVOC imputed with batch median & Backbone fit set (imputed TVOC); TinyOL val set \\
+2 & High-temp & $\approx$44\,h & $33.7{\pm}3.7$ & $66.2{\pm}9.4$ & All inside-node TVOC saturated throughout; TVOC imputed with batch median & Backbone fit set (imputed TVOC); TinyOL val set \\
 \hline
-3 & High-temp & $\approx$64\,h & Cleanest batch; temp SD \SI{0.55}{\celsius}, unambiguous onset progression & Backbone early-stopping validation \\
+3 & High-temp & $\approx$64\,h & $35.8{\pm}0.5$ & $58.5{\pm}4.7$ & Cleanest batch; unambiguous onset progression & Backbone early-stopping validation \\
 \hline
-4 & Low-temp & $\approx$47\,h & Onset timestamp confirmed post-collection; low-temperature regime & TinyOL fine-tuning; AIfES full training corpus \\
+4 & Low-temp & $\approx$47\,h & $20.0{\pm}0.8$ & $83.5{\pm}3.5$ & Onset timestamp confirmed post-collection; low-temperature regime & TinyOL fine-tuning; AIfES full training corpus \\
 \hline
-5 & Low-temp & $\approx$55\,h & Node~2 near-saturated pre-onset, compressing post-onset dynamic range & Held-out test set \\
+5 & Low-temp & $\approx$55\,h & $19.6{\pm}1.0$ & $82.3{\pm}3.6$ & Node~2 near-saturated pre-onset, compressing post-onset dynamic range & Held-out test set \\
 \hline
 \end{tabular}
 \end{table}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{images/fig_batch_env_conditions.png}
+    \caption{Mean temperature and relative humidity recorded at Node~1 (beside produce) and Node~2 (below produce) inside the storage container for each experimental batch. Error bars show one standard deviation. Batches~1--3 were conducted under a high-temperature heating regime (target $\approx$\SI{35}{\celsius}); Batches~4--5 were conducted at ambient low temperature ($\approx$\SI{20}{\celsius}). The markedly higher humidity in the low-temperature batches reflects reduced evaporative capacity of the cooler air and enhanced moisture retention from the enclosed strawberry samples.}
+    \label{fig:batch_env_conditions}
+\end{figure}
 
 Batch~2's TVOC saturation requires explanation. The SGP30 has a hardware measurement ceiling of \SI{59000}{ppb}. In Batch~2, the inside-node sensors reached and remained at this ceiling for the duration of the experiment --- not due to sensor malfunction, but because intense mould activity in the enclosed chamber accumulated VOCs beyond the sensor's measurable range. The per-batch median imputation used to handle these readings replaces the saturated values with the batch median, which is itself the saturation ceiling when all readings are saturated. In practice this means Batch~2 contributes TVOC features that are constant across all its samples. The model trained on this batch must rely on the other four features --- temperature, humidity, ethanol, and TVOC rate of change --- to extract discriminatory information from Batch~2's samples. This is acknowledged as a data quality limitation; it does not invalidate training but reduces the TVOC signal available from one of the two backbone batches. This limitation is explicitly retained in the dataset rather than discarding Batch~2 entirely, as the ethanol and humidity signals remained informative and dropping 394 samples would significantly reduce backbone training data.
 
@@ -83,7 +90,7 @@ Excluding Batch~1 (which entered with a pre-existing elevated baseline) and Batc
 The implication for machine learning is important: models trained on one set of absolute VOC levels may encounter different baselines in new deployments, but the post-onset trajectory --- a sustained increase relative to the pre-onset stable state --- is a stable, cross-batch indicator of \textit{Botrytis cinerea} activity. This is precisely the pattern that the trained classifier must learn to detect.
 
 % ─────────────────────────────────────────────────────────────────────────────
-\section{Node Energy Consumption}\label{sec:res_energy}
+\section{Node Energy Consumption and Enhancement Strategies}\label{sec:res_energy}
 % ─────────────────────────────────────────────────────────────────────────────
 
 \subsection{Component-Level Power Breakdown}\label{subsec:res_power_breakdown}
@@ -111,7 +118,71 @@ ESP32 + DHT22 (duty-cycle avg) & \SI{6.75}{\milli\ampere} & 4.0\% & Includes dee
 \end{tabular}
 \end{table}
 
-The wireless transmission step (ESP-NOW) takes approximately \SI{3}{\milli\second} per cycle and consumes less than \SI{2}{\milli\joule} per cycle --- under 0.01\% of the daily energy budget and operationally negligible.
+The wireless transmission step (ESP-NOW) takes approximately \SI{3}{\milli\second} per cycle and consumes less than \SI{2}{\milli\joule} per cycle --- under 0.01\% of the daily energy budget and operationally negligible. Figure~\ref{fig:duty_cycle_nodes} illustrates the timing relationship between the slave and master nodes within one 15-minute cycle.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+% ─── Geometry (not to scale — active phases exaggerated for readability) ─────
+\def\h{0.68}    % row height
+\def\yS{0}      % slave row y-base
+\def\yM{1.2}    % master row y-base
+
+% Column widths (cm); both rows total 10 cm = one 15-minute cycle
+% Slave:  7.5 sleep | 1.2 warm-up | 0.8 read+infer | 0.5 ESP-NOW TX
+% Master: 6.8 sleep | 1.2 warm-up | 2.0 receive window
+\def\slp{7.5}   \def\mlp{6.8}
+\def\wu{1.2}
+\def\sact{0.8}  \def\stx{0.5}
+\def\rw{2.0}
+
+% ─── Slave row ────────────────────────────────────────────────────────────────
+\fill[gray!22]   (0,\yS) rectangle (\slp,\yS+\h);
+\draw            (0,\yS) rectangle (\slp,\yS+\h);
+\node[font=\small] at (\slp/2, \yS+\h/2) {Deep Sleep ($\approx$14\,min)};
+
+\fill[yellow!55] (\slp,\yS) rectangle (\slp+\wu,\yS+\h);
+\draw            (\slp,\yS) rectangle (\slp+\wu,\yS+\h);
+\node[font=\scriptsize, align=center] at (\slp+\wu/2, \yS+\h/2) {SGP30\\warm-up\\45\,s};
+
+\fill[orange!55] (\slp+\wu,\yS) rectangle (\slp+\wu+\sact,\yS+\h);
+\draw            (\slp+\wu,\yS) rectangle (\slp+\wu+\sact,\yS+\h);
+\node[font=\scriptsize, align=center] at (\slp+\wu+\sact/2, \yS+\h/2) {Read +\\Infer\\$\sim$13\,s};
+
+\fill[red!60]    (\slp+\wu+\sact,\yS) rectangle (\slp+\wu+\sact+\stx,\yS+\h);
+\draw            (\slp+\wu+\sact,\yS) rectangle (\slp+\wu+\sact+\stx,\yS+\h);
+\node[font=\scriptsize, align=center] at (\slp+\wu+\sact+\stx/2, \yS+\h/2) {ESP-NOW\\TX\,3\,ms};
+
+% ─── Master row ───────────────────────────────────────────────────────────────
+\fill[gray!22]   (0,\yM) rectangle (\mlp,\yM+\h);
+\draw            (0,\yM) rectangle (\mlp,\yM+\h);
+\node[font=\small] at (\mlp/2, \yM+\h/2) {Deep Sleep ($\approx$12.8\,min)};
+
+\fill[yellow!55] (\mlp,\yM) rectangle (\mlp+\wu,\yM+\h);
+\draw            (\mlp,\yM) rectangle (\mlp+\wu,\yM+\h);
+\node[font=\scriptsize, align=center] at (\mlp+\wu/2, \yM+\h/2) {SGP30\\warm-up\\45\,s};
+
+\fill[green!40]  (\mlp+\wu,\yM) rectangle (\mlp+\wu+\rw,\yM+\h);
+\draw            (\mlp+\wu,\yM) rectangle (\mlp+\wu+\rw,\yM+\h);
+\node[font=\scriptsize, align=center] at (\mlp+\wu+\rw/2, \yM+\h/2) {ESP-NOW receive window\quad 90\,s};
+
+% ─── Row labels ───────────────────────────────────────────────────────────────
+\node[font=\small\bfseries, anchor=east] at (-0.2, \yS+\h/2) {Slave};
+\node[font=\small\bfseries, anchor=east] at (-0.2, \yM+\h/2) {Master};
+
+% ─── ESP-NOW transmission arrow (from slave TX to master receive window) ──────
+\draw[->, >=Stealth, dashed, red!70, line width=1pt]
+    (\slp+\wu+\sact+\stx/2, \yS+\h) --
+    (\slp+\wu+\sact+\stx/2, \yM);
+
+% ─── 15-minute cycle bracket ──────────────────────────────────────────────────
+\def\totalw{\slp+\wu+\sact+\stx}
+\draw[<->, >=Stealth] (0, \yM+\h+0.35) -- (\totalw, \yM+\h+0.35)
+    node[midway, above, font=\scriptsize] {15-minute duty cycle (not to scale)};
+\end{tikzpicture}
+\caption{Timing diagram for one 15-minute sensing cycle. The slave node spends approximately 14~minutes in deep sleep (\SI{10}{\micro\ampere}) and wakes approximately 76.5~seconds later than the master in each cycle, completing the \SI{45}{\second} SGP30 warm-up, sensor readings ($\approx$13\,s), and a \SI{3}{\milli\second} ESP-NOW transmission. The master wakes first, completes its own 45-second warm-up, and holds a 90-second receive window open to collect packets from both slave nodes before returning to deep sleep. The dashed arrow indicates the ESP-NOW packet transmitted by the slave, received during the master's open window.}
+\label{fig:duty_cycle_nodes}
+\end{figure}
 
 The ESP32 chip itself achieves approximately \SI{10}{\micro\ampere} in deep sleep. The \SI{6.75}{\milli\ampere} figure in Table~\ref{tab:power_breakdown} is the duty-cycle average over the full 900-second sensing cycle, which includes brief active-phase windows for SGP30 warm-up, sensor readings, ML inference, and ESP-NOW packet transmission.
 
@@ -119,7 +190,7 @@ The SGP30 requires a 45-second warm-up at power-on before its metal oxide sensin
 
 The MQ3's resistive heater is the dominant load at \SI{103.3}{\milli\ampere} per node, accounting for 61.5\% of average current. Its thermal stabilisation time exceeds the 15-minute sensing interval, making duty-cycling impractical without fundamentally changing the measurement protocol.
 
-Figure~\ref{fig:power_breakdown} illustrates the current-node breakdown alongside an improved configuration in which the MQ3 is replaced by a low-power MEMS gas sensor and the SGP30 is power-gated with a MOSFET between readings.
+Figure~\ref{fig:power_breakdown} illustrates the current-node breakdown alongside an improved configuration in which the MQ3 is replaced by the DFRobot SEN0569 low-power MEMS gas sensor \cite{DFRobotSEN0569} and the SGP30 is power-gated with a MOSFET between readings.
 
 \begin{figure}[htbp]
     \centering
