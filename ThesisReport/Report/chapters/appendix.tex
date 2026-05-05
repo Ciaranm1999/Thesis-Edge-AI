@@ -95,6 +95,27 @@ Figures~\ref{fig:app_aifes_traces}--\ref{fig:app_aifes_full_traces} show the PPK
 \end{figure}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section*{E\quad Experimental Batch Photography}
+\addcontentsline{toc}{section}{E\quad Experimental Batch Photography}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Figures~\ref{fig:app_batch3_start} and~\ref{fig:app_batch3_end} show the first and last camera images captured during Batch~3, the cleanest experimental batch (high-temperature regime, unambiguous onset progression). The Raspberry Pi 5 camera module captured one image per hour throughout the experiment; the images shown here represent the state of the strawberries at the start of the experiment (approximately 0~hours) and at its conclusion (approximately 91~hours, well after the recorded mould-onset point at $\approx$64~hours). These images were used exclusively for ground-truth labelling; they are not inputs to the sensor node.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{batch3_start.jpg}
+    \caption{Batch~3 --- start of experiment (2026-03-04, $\approx$0~hours). Strawberries freshly inoculated with \textit{Botrytis cinerea} spores. No visible mould at this stage; all sensor readings labelled class~0 (low risk).}
+    \label{fig:app_batch3_start}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{batch3_end.jpg}
+    \caption{Batch~3 --- end of experiment (2026-03-08, $\approx$91~hours). Visible grey mould (\textit{Botrytis cinerea}) established across the batch. Mould onset was recorded at $\approx$64~hours from the first image in which any growth was visible; all sensor readings from that point onward were labelled class~1 (high risk).}
+    \label{fig:app_batch3_end}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section*{D\quad Code and Data Availability}
 \addcontentsline{toc}{section}{D\quad Code and Data Availability}
 % ─────────────────────────────────────────────────────────────────────────────
