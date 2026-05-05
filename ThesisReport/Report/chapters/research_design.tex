@@ -1,8 +1,10 @@
 \chapter{Research Design}\label{chap:research}
 
-This chapter describes the experimental methodology used to answer the research questions. The procedure followed four stages: hardware construction and sensor node assembly, data collection inside a custom-built environmental test chamber, implementation of each TinyML framework, and energy measurement across all operational phases. Figure~\ref{fig:experimental_procedure} summarises the overall sequence.
+This chapter describes the experimental methodology used to answer the research questions. The procedure followed four stages, each building on the previous.
 
-\begin{figure}[tp]
+The first stage covered hardware construction: designing a custom printed circuit board integrating the ESP32 microcontroller with the DHT22, SGP30, and MQ3 sensors, assembling three identical nodes, and constructing the environmental test chamber used to induce controlled mould growth. The second stage was data collection: sensor readings were recorded at 15-minute intervals across five experimental batches while a Raspberry Pi~5 camera captured hourly images for ground-truth labelling. Binary mould risk labels were then assigned to each sensor record based on the first camera image in which visible mould growth was detected. The third stage was framework implementation: each of the three TinyML configurations --- TF Lite Micro (inference only), TinyOL (output-layer adaptation), and AIfES (full on-device training) --- was deployed on the ESP32 and validated against the collected dataset. The fourth stage was energy profiling: a Nordic Semiconductor PPK2 power analyser was used to measure the current draw of the sensor node across all operational phases, from idle sensing to full neural network training, providing the measurements needed to answer SQ1, SQ2, and SQ4. Figure~\ref{fig:experimental_procedure} summarises the overall sequence.
+
+\begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
     process/.style={draw, rectangle, rounded corners=4pt, minimum width=9cm, minimum height=0.85cm,

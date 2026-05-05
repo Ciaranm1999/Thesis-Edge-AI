@@ -33,6 +33,10 @@
 \newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}  % Centre col with width
 \usepackage{enumitem}
 \setlist{nosep}  % By default the separation is large
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{*2}{*1}
+\titlespacing*{\subsection}{0pt}{*2}{*1}
+\titlespacing*{\subsubsection}{0pt}{*2}{*1}
 \renewcommand{\glsgroupskip}{}
 
 
@@ -41,7 +45,7 @@
 
 \title{Energy Profiling of TinyML Frameworks for Autonomous Mould Detection on Disconnected Microcontroller Nodes}  % Title of your thesis
 \author{Ciaran Maher}  % Student name
-\supervisor{Dr. Ali Ghaffarinejad/ Dr. Bryan Williams}
+\supervisor{Ali Ghaffarinejad / Bryan Williams}
 % \cosupervisor{Name co-supervisor (Uncomment this line if there is no co-supervisor)}
 \courseyear{2025/2026}  % Year of your thesis
 \makeglossaries
