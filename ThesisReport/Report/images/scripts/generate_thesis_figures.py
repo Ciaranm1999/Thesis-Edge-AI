@@ -144,9 +144,9 @@ def fig_data_overview():
 
     w  = 0.35
     b1 = ax2.bar(x - w / 2, sat1, w, label='Node 1 — beside produce',
-                 color='#90CAF9', edgecolor=C_N1, linewidth=1)
+                 color=C_N1, edgecolor='#0D47A1', linewidth=1)
     b2 = ax2.bar(x + w / 2, sat2, w, label='Node 2 — below produce',
-                 color='#FFAB91', edgecolor=C_N2, linewidth=1)
+                 color=C_N2, edgecolor='#BF360C', linewidth=1)
     for bar_grp, col in [(b1, C_N1), (b2, C_N2)]:
         for bar in bar_grp:
             h = bar.get_height()
