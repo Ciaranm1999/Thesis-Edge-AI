@@ -16,35 +16,6 @@ An important clarification concerns what the system classifies. The network does
 
 Three TinyML frameworks are evaluated in this thesis, representing different points on a spectrum of on-device adaptation capability \cite{Dutta2021, Ficco2024}. TensorFlow Lite for Microcontrollers (TF Lite Micro) \cite{David2021} deploys a frozen pre-trained model with no on-device learning. TinyOL \cite{Disabato2021} deploys a partially trainable model, adapting only the final layer to local conditions. AIfES (Artificial Intelligence for Embedded Systems) \cite{Wulfert2024} supports full neural network training directly on the microcontroller, requiring no pre-trained model. Each approach represents a different trade-off between adaptation capability and energy consumption. Quantifying that trade-off --- in energy per operation and estimated battery lifetime --- is the central contribution of this thesis.
 
-\section{Research Questions}
-
-The primary research question investigated in this thesis is:
-
-\begin{quote}
-\textit{What is the energy cost of full on-device neural network training compared to partial adaptation and inference-only execution on an ESP32 microcontroller, and when is that cost operationally justified for autonomous, disconnected edge deployments?}
-\end{quote}
-
-Four sub-questions provide the measurements and analysis needed to answer the primary question:
-
-\begin{table}[H]
-\centering
-\caption{Research sub-questions and their expected outputs}
-\label{tab:subquestions}
-\begin{tabulary}{\textwidth}{|c|L|L|}
-\hline
-\textbf{\#} & \textbf{Sub-question} & \textbf{Output} \\
-\hline
-SQ1 & What is the baseline energy consumption of the mould detection system (ESP32 with DHT22, SGP30, and MQ3 sensors) during normal sensing operation, without any machine learning execution? & Baseline power budget: combined sensor and idle MCU consumption \\
-\hline
-SQ2 & How does the energy consumption of AIfES, TinyOL, and TF Lite Micro compare across training and inference phases on an ESP32? & Energy per training cycle and per inference cycle, per framework; RAM and Flash usage per framework \\
-\hline
-SQ3 & How does mould risk prediction accuracy compare across the three frameworks under representative environmental conditions? & Accuracy, precision, and recall per framework \\
-\hline
-SQ4 & What is the estimated battery lifetime of an autonomous mould detection node under each framework, given the measured energy profiles and a realistic deployment duty cycle? & Estimated operational runtime per battery capacity per framework, for current and improved hardware configurations \\
-\hline
-\end{tabulary}
-\end{table}
-
 \section{Project Goal}
 
 The goal of this project is to design and evaluate a low-cost mould risk monitoring system using an ESP32 microcontroller and environmental sensors, and to determine which TinyML framework --- AIfES, TinyOL, or TF Lite Micro --- best balances energy consumption, prediction performance, and operational autonomy for deployment in disconnected environments where cloud connectivity and manual maintenance are not available.
@@ -115,6 +86,35 @@ NFR4 & AIfES shall retrain once every 24 hours using the preceding 96 samples \\
 NFR5 & Battery lifetime shall be analytically estimated from measured energy profiles \\
 \hline
 NFR6 & The system shall use a custom PCB integrating the ESP32 and all sensors \\
+\hline
+\end{tabulary}
+\end{table}
+
+\section{Research Questions}
+
+The primary research question investigated in this thesis is:
+
+\begin{quote}
+\textit{What is the energy cost of full on-device neural network training compared to partial adaptation and inference-only execution on an ESP32 microcontroller, and when is that cost operationally justified for autonomous, disconnected edge deployments?}
+\end{quote}
+
+Four sub-questions provide the measurements and analysis needed to answer the primary question:
+
+\begin{table}[htbp]
+\centering
+\caption{Research sub-questions and their expected outputs}
+\label{tab:subquestions}
+\begin{tabulary}{\textwidth}{|c|L|L|}
+\hline
+\textbf{\#} & \textbf{Sub-question} & \textbf{Output} \\
+\hline
+SQ1 & What is the baseline energy consumption of the mould detection system (ESP32 with DHT22, SGP30, and MQ3 sensors) during normal sensing operation, without any machine learning execution? & Baseline power budget: combined sensor and idle MCU consumption \\
+\hline
+SQ2 & How does the energy consumption of AIfES, TinyOL, and TF Lite Micro compare across training and inference phases on an ESP32? & Energy per training cycle and per inference cycle, per framework; RAM and Flash usage per framework \\
+\hline
+SQ3 & How does mould risk prediction accuracy compare across the three frameworks under representative environmental conditions? & Accuracy, precision, and recall per framework \\
+\hline
+SQ4 & What is the estimated battery lifetime of an autonomous mould detection node under each framework, given the measured energy profiles and a realistic deployment duty cycle? & Estimated operational runtime per battery capacity per framework, for current and improved hardware configurations \\
 \hline
 \end{tabulary}
 \end{table}
