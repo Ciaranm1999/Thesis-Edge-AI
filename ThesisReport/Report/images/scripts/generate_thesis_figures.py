@@ -27,7 +27,7 @@ from matplotlib.lines import Line2D
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE = "C:/Users/cmahe/OneDrive/Desktop/SSE Masters/Thesis/Code/Thesis-Edge-AI/"
-OUT  = BASE + "ThesisReport/template/images/"
+OUT  = BASE + "ThesisReport/Report/images/"
 CSV  = BASE + "RaspberryPi/RaspberryPiData/analysis_exports/all_batches_ml_curated.csv"
 
 # ── Consistent colour palette ─────────────────────────────────────────────────
@@ -164,7 +164,7 @@ def fig_data_overview():
     ax2.set_ylim(0, top * 1.32)
     ax2.yaxis.grid(True, alpha=0.3);  ax2.set_axisbelow(True)
     ax2.annotate(
-        'Entire Batch 2\nsaturated — excluded\nfrom all training',
+        'Entire Batch 2\nsaturated; TVOC\nimputed for training',
         xy=(1, sat1[1] + 5), xytext=(1.65, sat1[1] * 0.55 + 30),
         fontsize=8.5, color=C_N2,
         arrowprops=dict(arrowstyle='->', color=C_N2, lw=1.2))
@@ -678,6 +678,178 @@ def fig_battery_lifetime():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# FIGURE 9 — Gantt-style timing diagram for one 15-minute sensing cycle
+# ═══════════════════════════════════════════════════════════════════════════════
+def fig_timing_diagram():
+    """
+    Gantt-style timing diagram for one 15-minute sensing cycle.
+    Uses a non-linear (breakpoint) x-axis so active phases remain readable
+    despite the 900 s total cycle duration.
+
+    Timing from firmware: Node_Main.cpp / Master_Node_Main.cpp
+      CYCLE_SECONDS = 900, SGP_WARMUP_SECONDS = 45,
+      MASTER_LISTEN_WINDOW_MS = 90000, TARGET_ARRIVAL_MS = 50000
+    """
+    CYCLE = 900
+
+    # Master phase intervals (seconds)
+    # Listen window closes as soon as both slave packets received (firmware line 528).
+    # Typical closure: ~52 s into cycle (both slaves arrive ~50 s + 2 s processing).
+    # Maximum timeout: 45 s warmup + 90 s = 135 s (MASTER_LISTEN_WINDOW_MS).
+    M_WARMUP = (0,   45)
+    M_READ   = (45,  46)
+    M_LISTEN = (46,  52)   # typical: closes when both packets received
+    M_SLEEP  = (52,  CYCLE)
+
+    # Slave phase intervals (slaves wake 4 s after master)
+    SL_OFF    = 4
+    SL_WARMUP = (SL_OFF,      SL_OFF + 45)   # (4, 49)
+    SL_READ   = (SL_OFF + 45, SL_OFF + 46)   # (49, 50)
+    SL_SYNC   = (SL_OFF + 46, SL_OFF + 48)   # (50, 52) ESP-NOW TX + correction wait
+    SL_SLEEP  = (SL_OFF + 48, CYCLE)          # (52, 900)
+
+    # ── Non-linear axis: map real seconds → display units ─────────────────────
+    # Active phases get generous display space; long sleep phases are compressed.
+    BPT = [0,   4,   45,  49,  52,  900]
+    BPX = [0.0, 0.5, 2.5, 3.8, 4.9, 10.8]
+
+    def t2x(t):
+        for i in range(len(BPT) - 1):
+            if BPT[i] <= t <= BPT[i+1]:
+                f = (t - BPT[i]) / (BPT[i+1] - BPT[i])
+                return BPX[i] + f * (BPX[i+1] - BPX[i])
+        return BPX[-1]
+
+    fig, ax = plt.subplots(figsize=(13, 4.0))
+
+    ROW_H  = 0.55
+    Y_GAP  = 0.20
+    Y_ROWS = [0, ROW_H + Y_GAP, 2 * (ROW_H + Y_GAP)]  # slave2, slave1, master
+
+    CLR = {
+        'sleep':  '#CECECE',
+        'warmup': '#FFC857',
+        'read':   '#F4845F',
+        'listen': '#6BCB77',
+        'tx':     '#E63946',
+    }
+    EDGE = '#555555'
+    LW   = 0.6
+
+    def hbar(row, t_start, t_end, color):
+        xs = t2x(t_start)
+        xe = t2x(t_end)
+        ax.broken_barh([(xs, xe - xs)], (Y_ROWS[row], ROW_H),
+                       facecolors=color, edgecolors=EDGE, linewidth=LW)
+
+    def blabel(row, t_start, t_end, txt, fs=8.5, col='#222222'):
+        mid_x = (t2x(t_start) + t2x(t_end)) / 2
+        mid_y = Y_ROWS[row] + ROW_H / 2
+        ax.text(mid_x, mid_y, txt, ha='center', va='center',
+                fontsize=fs, color=col, clip_on=True)
+
+    # ── Master bars (row 2 — top) ─────────────────────────────────────────────
+    hbar(2, M_WARMUP[0], M_WARMUP[1], CLR['warmup'])
+    hbar(2, M_READ[0],   M_READ[1],   CLR['read'])
+    hbar(2, M_LISTEN[0], M_LISTEN[1], CLR['listen'])
+    hbar(2, M_SLEEP[0],  M_SLEEP[1],  CLR['sleep'])
+
+    # ── Slave 1 bars (row 1) ─────────────────────────────────────────────────
+    hbar(1, 0,            SL_OFF,        CLR['sleep'])
+    hbar(1, SL_WARMUP[0], SL_WARMUP[1], CLR['warmup'])
+    hbar(1, SL_READ[0],   SL_READ[1],   CLR['read'])
+    hbar(1, SL_SYNC[0],   SL_SYNC[1],   CLR['tx'])
+    hbar(1, SL_SLEEP[0],  SL_SLEEP[1],  CLR['sleep'])
+
+    # ── Slave 2 bars (row 0 — identical firmware) ─────────────────────────────
+    hbar(0, 0,            SL_OFF,        CLR['sleep'])
+    hbar(0, SL_WARMUP[0], SL_WARMUP[1], CLR['warmup'])
+    hbar(0, SL_READ[0],   SL_READ[1],   CLR['read'])
+    hbar(0, SL_SYNC[0],   SL_SYNC[1],   CLR['tx'])
+    hbar(0, SL_SLEEP[0],  SL_SLEEP[1],  CLR['sleep'])
+
+    # ── In-bar labels (only on bars wide enough to hold text) ────────────────
+    blabel(2, M_WARMUP[0], M_WARMUP[1], 'SGP30 warm-up\n(45 s)', fs=8.5)
+    blabel(2, M_LISTEN[0], M_LISTEN[1], 'Listen\n(max 90 s)', fs=7.5)
+    blabel(2, M_SLEEP[0],  M_SLEEP[1],
+           f'Deep sleep  ({(M_SLEEP[1]-M_SLEEP[0])/60:.0f} min)', fs=9, col='#555555')
+
+    blabel(1, SL_WARMUP[0], SL_WARMUP[1], 'SGP30 warm-up  (45 s)', fs=8.5)
+    blabel(1, SL_SLEEP[0],  SL_SLEEP[1],
+           f'Deep sleep  ({(SL_SLEEP[1]-SL_SLEEP[0])/60:.0f} min)', fs=9, col='#555555')
+
+    blabel(0, SL_WARMUP[0], SL_WARMUP[1], 'SGP30 warm-up  (45 s)', fs=8.5)
+    blabel(0, SL_SLEEP[0],  SL_SLEEP[1],
+           f'Deep sleep  ({(SL_SLEEP[1]-SL_SLEEP[0])/60:.0f} min)', fs=9, col='#555555')
+
+    # TX/sync callout — text placed below slave 2 bar (slave 2 occupies y=0..ROW_H)
+    # xytext must be at y < 0 to avoid overlapping the bars.
+    tx_xc = (t2x(SL_SYNC[0]) + t2x(SL_SYNC[1])) / 2
+    ax.annotate('ESP-NOW TX (3 ms)\n+ sync (≤2 s)',
+                xy=(tx_xc, Y_ROWS[0]),                   # bottom of slave 2 bar (y=0)
+                xytext=(tx_xc + 0.1, Y_ROWS[0] - 0.48),  # below slave 2 (y=-0.48)
+                fontsize=7.5, color='#C62828', ha='center', va='top',
+                arrowprops=dict(arrowstyle='->', color='#C62828', lw=0.9))
+
+    # ── Dashed arrows: slave TX → master listen window ────────────────────────
+    m_bot    = Y_ROWS[2]
+    sl1_top  = Y_ROWS[1] + ROW_H
+    sl2_top  = Y_ROWS[0] + ROW_H
+
+    ax.annotate('', xy=(tx_xc, m_bot), xytext=(tx_xc, sl1_top),
+                arrowprops=dict(arrowstyle='->', color='#E63946',
+                                lw=1.4, linestyle='dashed'))
+    ax.annotate('', xy=(tx_xc, m_bot), xytext=(tx_xc, sl2_top),
+                arrowprops=dict(arrowstyle='->', color='#E63946',
+                                lw=1.4, linestyle='dashed'))
+
+    # ── Y-axis labels ─────────────────────────────────────────────────────────
+    ax.set_yticks([Y_ROWS[i] + ROW_H / 2 for i in range(3)])
+    ax.set_yticklabels(['Slave 2', 'Slave 1', 'Master'], fontsize=10)
+    ax.tick_params(axis='y', length=0)
+
+    # ── Non-linear X-axis: ticks at breakpoints, labels = real seconds ────────
+    X_MAX = BPX[-1]
+    ax.set_xlim(-0.25, X_MAX + 0.25)
+    ax.set_xticks([t2x(t) for t in BPT])
+    ax.set_xticklabels([f'{t} s' for t in BPT], fontsize=8.5)
+    ax.set_xlabel('Time elapsed in cycle (s)  —  sleep phases compressed', fontsize=9)
+
+    # Vertical reference lines at key transitions
+    for t_ref in [45, 52]:
+        ax.axvline(t2x(t_ref), color='#AAAAAA', lw=0.8, linestyle=':', zorder=0)
+
+    # ── Legend ────────────────────────────────────────────────────────────────
+    legend_items = [
+        mpatches.Patch(facecolor=CLR['sleep'],  edgecolor=EDGE, label='Deep sleep'),
+        mpatches.Patch(facecolor=CLR['warmup'], edgecolor=EDGE, label='SGP30 warm-up (45 s)'),
+        mpatches.Patch(facecolor=CLR['read'],   edgecolor=EDGE, label='Sensor reads (DHT22, MQ3)'),
+        mpatches.Patch(facecolor=CLR['listen'], edgecolor=EDGE, label='ESP-NOW listen window (closes early; max 90 s)'),
+        mpatches.Patch(facecolor=CLR['tx'],     edgecolor=EDGE, label='ESP-NOW TX + timing sync'),
+    ]
+    ax.legend(handles=legend_items, loc='lower right',
+              fontsize=8, framealpha=0.92, ncol=1)
+
+    # ── 15-minute cycle bracket ───────────────────────────────────────────────
+    bracket_y = Y_ROWS[2] + ROW_H + 0.38
+    ax.annotate('', xy=(X_MAX, bracket_y), xytext=(0, bracket_y),
+                arrowprops=dict(arrowstyle='<->', color='#444444', lw=1.0))
+    ax.text(X_MAX / 2, bracket_y + 0.04, '15-minute duty cycle  (900 s)',
+            ha='center', va='bottom', fontsize=8.5, color='#333333')
+
+    ax.set_ylim(-0.78, bracket_y + 0.22)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.grid(False)
+    ax.tick_params(axis='x', which='both', bottom=True, length=4)
+
+    plt.tight_layout()
+    plt.savefig(OUT + 'fig_duty_cycle_nodes.png', dpi=150, bbox_inches='tight')
+    plt.close()
+    print('  Saved: fig_duty_cycle_nodes.png')
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Run all
 # ═══════════════════════════════════════════════════════════════════════════════
 if __name__ == '__main__':
@@ -690,4 +862,5 @@ if __name__ == '__main__':
     fig_ml_comparison()
     fig_tradeoff()
     fig_battery_lifetime()
+    fig_timing_diagram()
     print(f"\nDone. All figures saved to: {OUT}")
