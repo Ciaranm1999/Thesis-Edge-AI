@@ -121,67 +121,10 @@ ESP32 + DHT22 (duty-cycle avg) & \SI{6.75}{\milli\ampere} & 4.0\% & Includes dee
 The wireless transmission step (ESP-NOW) takes approximately \SI{3}{\milli\second} per cycle and consumes less than \SI{2}{\milli\joule} per cycle --- under 0.01\% of the daily energy budget and operationally negligible. Figure~\ref{fig:duty_cycle_nodes} illustrates the timing relationship between the slave and master nodes within one 15-minute cycle.
 
 \begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-% ─── Geometry (not to scale — active phases exaggerated for readability) ─────
-\def\h{0.68}    % row height
-\def\yS{0}      % slave row y-base
-\def\yM{1.2}    % master row y-base
-
-% Column widths (cm); both rows total 10 cm = one 15-minute cycle
-% Slave:  7.5 sleep | 1.2 warm-up | 0.8 read+infer | 0.5 ESP-NOW TX
-% Master: 6.8 sleep | 1.2 warm-up | 2.0 receive window
-\def\slp{7.5}   \def\mlp{6.8}
-\def\wu{1.2}
-\def\sact{0.8}  \def\stx{0.5}
-\def\rw{2.0}
-
-% ─── Slave row ────────────────────────────────────────────────────────────────
-\fill[gray!22]   (0,\yS) rectangle (\slp,\yS+\h);
-\draw            (0,\yS) rectangle (\slp,\yS+\h);
-\node[font=\small] at (\slp/2, \yS+\h/2) {Deep Sleep ($\approx$14\,min)};
-
-\fill[yellow!55] (\slp,\yS) rectangle (\slp+\wu,\yS+\h);
-\draw            (\slp,\yS) rectangle (\slp+\wu,\yS+\h);
-\node[font=\scriptsize, align=center] at (\slp+\wu/2, \yS+\h/2) {SGP30\\warm-up\\45\,s};
-
-\fill[orange!55] (\slp+\wu,\yS) rectangle (\slp+\wu+\sact,\yS+\h);
-\draw            (\slp+\wu,\yS) rectangle (\slp+\wu+\sact,\yS+\h);
-\node[font=\scriptsize, align=center] at (\slp+\wu+\sact/2, \yS+\h/2) {Read +\\Infer\\$\sim$13\,s};
-
-\fill[red!60]    (\slp+\wu+\sact,\yS) rectangle (\slp+\wu+\sact+\stx,\yS+\h);
-\draw            (\slp+\wu+\sact,\yS) rectangle (\slp+\wu+\sact+\stx,\yS+\h);
-\node[font=\scriptsize, align=center] at (\slp+\wu+\sact+\stx/2, \yS+\h/2) {ESP-NOW\\TX\,3\,ms};
-
-% ─── Master row ───────────────────────────────────────────────────────────────
-\fill[gray!22]   (0,\yM) rectangle (\mlp,\yM+\h);
-\draw            (0,\yM) rectangle (\mlp,\yM+\h);
-\node[font=\small] at (\mlp/2, \yM+\h/2) {Deep Sleep ($\approx$12.8\,min)};
-
-\fill[yellow!55] (\mlp,\yM) rectangle (\mlp+\wu,\yM+\h);
-\draw            (\mlp,\yM) rectangle (\mlp+\wu,\yM+\h);
-\node[font=\scriptsize, align=center] at (\mlp+\wu/2, \yM+\h/2) {SGP30\\warm-up\\45\,s};
-
-\fill[green!40]  (\mlp+\wu,\yM) rectangle (\mlp+\wu+\rw,\yM+\h);
-\draw            (\mlp+\wu,\yM) rectangle (\mlp+\wu+\rw,\yM+\h);
-\node[font=\scriptsize, align=center] at (\mlp+\wu+\rw/2, \yM+\h/2) {ESP-NOW receive window\quad 90\,s};
-
-% ─── Row labels ───────────────────────────────────────────────────────────────
-\node[font=\small\bfseries, anchor=east] at (-0.2, \yS+\h/2) {Slave};
-\node[font=\small\bfseries, anchor=east] at (-0.2, \yM+\h/2) {Master};
-
-% ─── ESP-NOW transmission arrow (from slave TX to master receive window) ──────
-\draw[->, >=Stealth, dashed, red!70, line width=1pt]
-    (\slp+\wu+\sact+\stx/2, \yS+\h) --
-    (\slp+\wu+\sact+\stx/2, \yM);
-
-% ─── 15-minute cycle bracket ──────────────────────────────────────────────────
-\def\totalw{\slp+\wu+\sact+\stx}
-\draw[<->, >=Stealth] (0, \yM+\h+0.35) -- (\totalw, \yM+\h+0.35)
-    node[midway, above, font=\scriptsize] {15-minute duty cycle (not to scale)};
-\end{tikzpicture}
-\caption{Timing diagram for one 15-minute sensing cycle. The slave node spends approximately 14~minutes in deep sleep (\SI{10}{\micro\ampere}) and wakes approximately 76.5~seconds later than the master in each cycle, completing the \SI{45}{\second} SGP30 warm-up, sensor readings ($\approx$13\,s), and a \SI{3}{\milli\second} ESP-NOW transmission. The master wakes first, completes its own 45-second warm-up, and holds a 90-second receive window open to collect packets from both slave nodes before returning to deep sleep. The dashed arrow indicates the ESP-NOW packet transmitted by the slave, received during the master's open window.}
-\label{fig:duty_cycle_nodes}
+    \centering
+    \includegraphics[width=\textwidth]{images/fig_duty_cycle_nodes.png}
+    \caption{Gantt-style timing diagram for one 15-minute (900\,s) sensing cycle across all three mesh nodes. The master wakes first, completes a \SI{45}{\second} SGP30 warm-up and its own DHT22/MQ3 readings, then opens an ESP-NOW listen window (maximum \SI{90}{\second}). Both slave nodes run identical firmware: they wake approximately \SI{4}{\second} after the master, complete the same \SI{45}{\second} SGP30 warm-up and sensor reads, then transmit a \SI{3}{\milli\second} ESP-NOW packet (red bars) that is received by the master during its open window. Once all slave packets are received the master closes its listen window early --- typically around \SI{52}{\second} into the cycle --- and sends a timing-correction packet back to each slave to keep the mesh synchronised. All three nodes then return to deep sleep for the remainder of the 900-second cycle. Dashed red arrows indicate the ESP-NOW transmissions from each slave to the master.}
+    \label{fig:duty_cycle_nodes}
 \end{figure}
 
 The ESP32 chip itself achieves approximately \SI{10}{\micro\ampere} in deep sleep. The \SI{6.75}{\milli\ampere} figure in Table~\ref{tab:power_breakdown} is the duty-cycle average over the full 900-second sensing cycle, which includes brief active-phase windows for SGP30 warm-up, sensor readings, ML inference, and ESP-NOW packet transmission.
